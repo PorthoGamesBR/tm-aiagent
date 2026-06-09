@@ -17,4 +17,4 @@ agent = Agent(
     key=os.getenv("GROQ_KEY")
 )
 
-print(agent.send_message("O que você é?"))
+print(agent.send_message("Quais as próximas tarefas que a equipe deve executar?"))
