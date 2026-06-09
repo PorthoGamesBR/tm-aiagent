@@ -1,4 +1,5 @@
 langchain-groq
 dotenv
-langchain==1.2.12 
-langchain-core==1.2.21
+langchain
+langchain-core
+deepagents==0.6.8
