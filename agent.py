@@ -5,26 +5,24 @@ from staticcontext import StaticContextLoader
 
 
 class Agent:
-    BASE_SYSTEM_PROMPT = """
-    Você é o Gerente de Projetos e Operações sênior da Ouv.ai, uma startup de Banking Tech (B2B). 
-    Seu estilo de gestão é altamente pragmático, direto ao ponto e focado em eficiência.
-
-    Abaixo estão as informações estruturais e estáticas da nossa empresa que você DEVE conhecer e seguir:
-
-    =========================================
-    INFORMAÇÕES DE NEGÓCIO:
-    {business_info}
-    =========================================
-    DOCUMENTAÇÃO DO PROJETO E PRODUTO:
-    {project_info}
-    =========================================
-    MATRIZ DA EQUIPE E PERFIS:
-    {team_info}
-    =========================================
-
-    Seu papel é atuar como líder técnico e operacional. Quando o usuário te der uma instrução, use as ferramentas disponíveis para buscar o estado em tempo real dos sistemas (como o Trello) e combine com a base estática acima para ditar os rituais, cobrar o time nominalmente e organizar o fluxo de trabalho.
-    """
+    _PERSONA = """
+        Você é o Gerente de Projetos e Operações sênior da Ouv.ai, uma startup de Banking Tech (B2B). 
+        Seu estilo de gestão é altamente pragmático, direto ao ponto e focado em eficiência.
+        Seu papel é analisar o contexto do negócio e do time e ditar o ritmo das operações.
+        """
     
+    _SYSTEM_PROMPT_TEMPLATE = """
+        {persona}
+        
+        Aqui está o conhecimento proprietário e atualizado sobre a Ouv.ai que você deve usar para guiar suas decisões e respostas:
+        {contexto_estatico}
+        
+        Instruções operacionais:
+        - Se a mensagem do usuário for apenas uma dúvida, responda diretamente de forma analítica e estratégica.
+        - Se a mensagem demandar uma ação no mundo real, use as ferramentas disponíveis para consultar ou alterar o estado dos sistemas (como o Trello).
+        """
+        
+        
     class models:
         GROQ = "groq"
 
@@ -35,6 +33,7 @@ class Agent:
         self.api_key = key
         self.agent = self.instantiate_agent()
         
+        
     def instantiate_agent(self):
         llm = None
         if self.model == Agent.models.GROQ:
@@ -42,16 +41,15 @@ class Agent:
         else:
             raise NotImplementedError
         
-        system_prompt_final = Agent.BASE_SYSTEM_PROMPT.format(
-            business_info=self.static_data['business_info'],
-            project_info=self.static_data['project_info'],
-            team_info=self.static_data['team_info']
+        contexto = f"{self.static_data['business_info']}\n{self.static_data['project_info']}\n{self.static_data['team_info']}\n"
+        
+        system_prompt_final = Agent._SYSTEM_PROMPT_TEMPLATE.format(
+            persona = Agent._PERSONA,
+            contexto_estatico=contexto
         )
         
         tools = []
-        agent = create_agent(llm, 
-                             tools=tools,
-                             system_prompt=system_prompt_final)
+        agent = create_agent(llm, tools=tools, system_prompt=system_prompt_final)
         return agent
     
     def groq(self):
@@ -59,7 +57,7 @@ class Agent:
         llm = ChatGroq(
             api_key=self.api_key,
             model_name="llama-3.3-70b-versatile",
-            temperature=0.5
+            temperature=0.1
         )
         
         return llm
