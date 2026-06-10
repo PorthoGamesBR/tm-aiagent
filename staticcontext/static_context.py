@@ -1,6 +1,7 @@
 import os
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings # Ou OpenAIEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 class StaticContextLoader:
     
@@ -25,9 +26,17 @@ class StaticContextLoader:
             self._read_file("PROJECT.md"),
             self._read_file("TEAM.md")
         ]
-        return FAISS.from_texts(textos, self.embeddings)
+        
+        text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=600, 
+        chunk_overlap=100
+        )
+        
+        documentos_fragmentados = text_splitter.create_documents(textos)
+        
+        return FAISS.from_documents(documentos_fragmentados, self.embeddings)
 
     def buscar_contexto(self, query: str) -> str:
         # Busca os trechos mais parecidos com a dúvida do usuário
-        documentos = self.vector_store.similarity_search(query, k=1)
+        documentos = self.vector_store.similarity_search(query, k=3)
         return "\n".join([doc.page_content for doc in documentos])
