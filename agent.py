@@ -1,7 +1,6 @@
 from langchain_groq import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.agents import create_agent
-from staticcontext import StaticContextLoader
+from tools import consultar_manuais
 
 
 class Agent:
@@ -14,9 +13,6 @@ class Agent:
     _SYSTEM_PROMPT_TEMPLATE = """
         {persona}
         
-        Aqui está o conhecimento proprietário e atualizado sobre a Ouv.ai que você deve usar para guiar suas decisões e respostas:
-        {contexto_estatico}
-        
         Instruções operacionais:
         - Se a mensagem do usuário for apenas uma dúvida, responda diretamente de forma analítica e estratégica.
         - Se a mensagem demandar uma ação no mundo real, use as ferramentas disponíveis para consultar ou alterar o estado dos sistemas (como o Trello).
@@ -27,8 +23,6 @@ class Agent:
         GROQ = "groq"
 
     def __init__(self, model, key):
-        context_loader = StaticContextLoader()
-        self.static_data = context_loader.get_all_context()
         self.model = model
         self.api_key = key
         self.agent = self.instantiate_agent()
@@ -41,14 +35,12 @@ class Agent:
         else:
             raise NotImplementedError
         
-        contexto = f"{self.static_data['business_info']}\n{self.static_data['project_info']}\n{self.static_data['team_info']}\n"
         
         system_prompt_final = Agent._SYSTEM_PROMPT_TEMPLATE.format(
-            persona = Agent._PERSONA,
-            contexto_estatico=contexto
+            persona = Agent._PERSONA
         )
         
-        tools = []
+        tools = [consultar_manuais]
         agent = create_agent(llm, tools=tools, system_prompt=system_prompt_final)
         return agent
     

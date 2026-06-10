@@ -1,0 +1,1 @@
+from .static_retriever import consultar_manuais

@@ -1,4 +1,8 @@
 langchain-groq
 dotenv
-langchain==1.2.12 
-langchain-core==1.2.21
+langchain
+langchain-core
+langchain-community
+sentence-transformers
+langchain-huggingface
+faiss-cpu
