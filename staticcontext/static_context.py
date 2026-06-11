@@ -28,8 +28,8 @@ class StaticContextLoader:
         ]
         
         text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=600, 
-        chunk_overlap=100
+        chunk_size=150, 
+        chunk_overlap=50
         )
         
         documentos_fragmentados = text_splitter.create_documents(textos)

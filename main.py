@@ -17,4 +17,6 @@ agent = Agent(
     key=os.getenv("GROQ_KEY")
 )
 
-print(agent.send_message("Quais as próximas tarefas que a equipe deve executar?"))
+response = agent.send_message("Quais as proximas tarefas que o Ibere e o Vitor devem fazer?", config={"recursion_limit":12})
+print("RESPOSTA DO AGENTE: ")
+print(response)
