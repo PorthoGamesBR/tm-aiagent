@@ -9,11 +9,10 @@ Somos uma equipe formada pro 4 profissionais técnicos. Somos bons em criar cois
 Temos uma visão do que queremos criar e por que. Somos simultaneamente os stakeholders do projeto e seus desenvolvedores.
 
 Os problemas que enfrentamos são:
-- Apenas um de nós cria quase todo o código com o Claude Code. Chamaremos de "O Visionário", aquele que cria a base das ideias dos projetos.
+- Apenas um de nós cria quase todo o código com um agente de IA. Chamaremos de "O Visionário", aquele que cria a base das ideias dos projetos.
 - Muito codigo, documentos e features são criados em pouco tempo, mas não sabemos como entregar, como vender o que criamos, nem sabemos se falta algo para entregar.
 - Dois acabam não fazendo nada por não saberem o que precisa ser feito. Vamos chamá-los de "Os Contratados"
 - Um entende mais de tecnologia e consegue analisar arquitetura de tecnologia mais profundamente, mas não entende bem de criar tarefas e comunicação. Vamos chama-lo de "O Nerd"
-- Todos são meio ruins em comunicação para organização.
 - No fim não temos um roadmap, apenas estamos adicionando coisas à um projeto sem saber como transformá-lo em um produto de verdade.
 
 A solução que quero criar deve:
