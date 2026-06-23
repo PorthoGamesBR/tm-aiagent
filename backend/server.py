@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from fastapi.staticfiles import StaticFiles
+
 
 class Settings(BaseSettings):
     groq_key: str
@@ -15,9 +17,7 @@ class Settings(BaseSettings):
 settings = Settings()
 app = FastAPI()
 
-@app.get("/")
-async def root():
-    return {"message": "Hello World"}
+app.mount("/", StaticFiles(directory="../front", html=True), name="static")
 
 @app.get("/health")
 async def health():
