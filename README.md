@@ -36,6 +36,7 @@ Preciso fazer esse agente ser acessível para a equipe. Pensei no seguinte setup
 - Fast-API para o backend. Precisa ser agnostico pois ainda não sabemos qual cloud vamos usar·
     - JWT para controle de acesso
     - Duas rotas de get, login e chat
+    - Usando Render por enquanto pelo free tier
 - Agnostico para banco de dados tambem, pelo mesmo motivo
     - Temporariamente Firebase por ser de gratis (Tanto historico de conversa quanto documento de contexto salvo)
     - Autenticação é registrada manualmente pelo admin
@@ -57,7 +58,11 @@ uvicorn backend.server:app --reload
 ```
 
 ### Passo 2 - Páginas Estáticas
+Precisamos de duas páginas estáticas:
+- Login
+- Chat (Já temos, só precisamos adaptar a logica)
 
+Se os dois GETs estiverem funcionando, ta ok
 ### Passo 3 - Endpoints
 - Login
 - Logout
