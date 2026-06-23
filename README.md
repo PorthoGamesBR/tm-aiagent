@@ -63,6 +63,11 @@ Precisamos de duas páginas estáticas:
 - Chat (Já temos, só precisamos adaptar a logica)
 
 Se os dois GETs estiverem funcionando, ta ok
+
+_O que seria adaptar a lógica?_  
+No momento a página executa lógica de backend no front. Precisamos colocar toda a lógica de chamada de agente, acesso de arquivos, etc, no backend, para que o front apenas chame os endpoints.
+
+Se
 ### Passo 3 - Endpoints
 - Login
 - Logout
@@ -70,12 +75,15 @@ Se os dois GETs estiverem funcionando, ta ok
 - Chat
 - Conversations
 - Conversations (ID)
+- Context Doc
 
 ### Passo 4 - Requests
 Objetos para validar formato da requisição do usuário ao servidor
 
 ### Passo 5 - Serviços
-Lógica de negócio para rodar autenticação e comunicação com o LLM
+Lógica de negócio para rodar autenticação e comunicação com a LLM
+
+Quando o primeiro agente rodar, salva o documento de contexto na database.
 
 ### Passo 6 - Separação
 Endpoints vão para API, Logica de negócios para Serviços
@@ -83,12 +91,16 @@ Endpoints vão para API, Logica de negócios para Serviços
 ### Passo 7 - Database agnóstica
 Abstrações para acesso de databases.
 
-Usuários e chat.
+Usuários, chat, documento de contexto.
 
 Definição de forma de dados é nos modelos.
 
 ### Passo 8 - Modelos
 Entidades de negócio: user, chat e message.
 
+### Passo 9 - Main
+Servidor inicializado pela main, com o agente sendo configurado antes e depois passado para o servidor.
 
+O objetivo disso é poder separar e testar individualmente a lógica do agente e das tools, sem precisar rodar o servidor pra isso.
 
+Em vez do backend se comunicar diretamente com o Groq, quem configura os objetos de agente para se comunicarem com o Groq é ```main.py``` e ```agent.py```, depois disponibilizando o objeto criado para o servidor. Ainda não sei como passar os objetos para a camada de negócio, é uma coisa que preciso ver ainda.
