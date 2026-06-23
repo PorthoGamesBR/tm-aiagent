@@ -6,3 +6,12 @@ langchain-community
 sentence-transformers
 langchain-huggingface
 faiss-cpu
+# backend
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+python-jose[cryptography]
+passlib[bcrypt]
+firebase-admin
+httpx

@@ -1,0 +1,1468 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ops Agent — Painel de Controle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy: #0F1C2E;
+    --navy-hover: #162438;
+    --navy-light: #1E2F47;
+    --blue: #1A56DB;
+    --blue-light: #EBF2FF;
+    --blue-mid: #2563EB;
+    --surface: #F8FAFC;
+    --white: #FFFFFF;
+    --border: #E2E8F0;
+    --border-dark: #CBD5E1;
+    --text-primary: #0F172A;
+    --text-secondary: #475569;
+    --text-muted: #94A3B8;
+    --text-sidebar: #CBD5E1;
+    --text-sidebar-muted: #64748B;
+    --green: #059669;
+    --green-bg: #ECFDF5;
+    --green-text: #065F46;
+    --amber: #D97706;
+    --amber-bg: #FFFBEB;
+    --amber-text: #92400E;
+    --red: #DC2626;
+    --red-bg: #FEF2F2;
+    --radius: 8px;
+    --radius-lg: 12px;
+    --font: 'Inter', system-ui, sans-serif;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--surface);
+    color: var(--text-primary);
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── SIDEBAR ── */
+  #sidebar {
+    width: 260px;
+    min-width: 260px;
+    background: var(--navy);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .sidebar-header {
+    padding: 20px 16px 16px;
+    border-bottom: 1px solid var(--navy-light);
+  }
+
+  .sidebar-logo {
+    font-size: 13px;
+    font-weight: 600;
+    color: #FFFFFF;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .sidebar-sub {
+    font-size: 11px;
+    color: var(--text-sidebar-muted);
+  }
+
+  /* user identity */
+  #identity-section {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--navy-light);
+  }
+
+  #identity-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-sidebar-muted);
+    margin-bottom: 6px;
+  }
+
+  #identity-display {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--blue);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  #identity-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #fff;
+  }
+
+  #change-user-btn {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text-sidebar-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: color 0.15s;
+  }
+  #change-user-btn:hover { color: var(--text-sidebar); }
+
+  /* agent sections */
+  .sidebar-section {
+    padding: 12px 16px 6px;
+  }
+
+  .sidebar-section-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-sidebar-muted);
+    margin-bottom: 8px;
+  }
+
+  /* agent item */
+  .agent-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: var(--radius);
+    margin-bottom: 2px;
+    cursor: default;
+    transition: background 0.15s;
+  }
+
+  .agent-item.active-agent {
+    background: var(--navy-light);
+    cursor: pointer;
+  }
+
+  .agent-item.active-agent:hover { background: #243A55; }
+
+  .agent-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .dot-active { background: var(--green); }
+  .dot-locked { background: #374151; }
+  .dot-pending { background: var(--amber); }
+
+  .agent-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-sidebar);
+    flex: 1;
+  }
+
+  .agent-name.dimmed { color: var(--text-sidebar-muted); }
+
+  .agent-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+  }
+
+  .badge-active { background: #064E3B; color: #6EE7B7; }
+  .badge-locked { background: #1F2937; color: #6B7280; }
+  .badge-pending { background: #78350F; color: #FCD34D; }
+
+  /* new chat button */
+  #new-chat-btn {
+    margin: 8px 16px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-weight: 500;
+    font-family: var(--font);
+    cursor: pointer;
+    width: calc(100% - 32px);
+    transition: background 0.15s;
+  }
+  #new-chat-btn:hover { background: var(--blue-mid); }
+  #new-chat-btn svg { flex-shrink: 0; }
+
+  /* chat history list */
+  #chat-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 16px 16px;
+  }
+
+  #chat-list::-webkit-scrollbar { width: 4px; }
+  #chat-list::-webkit-scrollbar-track { background: transparent; }
+  #chat-list::-webkit-scrollbar-thumb { background: var(--navy-light); border-radius: 2px; }
+
+  .chat-list-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-sidebar-muted);
+    margin: 10px 0 6px;
+  }
+
+  .chat-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 8px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background 0.15s;
+    margin-bottom: 1px;
+  }
+
+  .chat-item:hover { background: var(--navy-light); }
+  .chat-item.selected { background: var(--navy-light); }
+
+  .chat-item-icon {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .chat-item-title {
+    font-size: 12px;
+    color: var(--text-sidebar);
+    flex: 1;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .chat-item-type {
+    font-size: 10px;
+    color: var(--text-sidebar-muted);
+    flex-shrink: 0;
+  }
+
+  .chat-delete-btn {
+    background: none;
+    border: none;
+    color: var(--text-sidebar-muted);
+    cursor: pointer;
+    padding: 2px;
+    border-radius: 3px;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s;
+    display: flex;
+    align-items: center;
+  }
+  .chat-item:hover .chat-delete-btn { opacity: 1; }
+  .chat-delete-btn:hover { color: #F87171; }
+
+  /* ── MAIN ── */
+  #main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--white);
+  }
+
+  /* top bar */
+  #topbar {
+    height: 52px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+
+  #chat-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    flex: 1;
+  }
+
+  .topbar-tag {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+
+  .tag-onboarding { background: var(--amber-bg); color: var(--amber-text); }
+  .tag-ops { background: var(--blue-light); color: #1E3A8A; }
+
+  /* context status pill */
+  #context-status {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .ctx-ready { background: var(--green-bg); color: var(--green-text); }
+  .ctx-missing { background: var(--amber-bg); color: var(--amber-text); }
+
+  /* messages area */
+  #messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  #messages::-webkit-scrollbar { width: 5px; }
+  #messages::-webkit-scrollbar-track { background: transparent; }
+  #messages::-webkit-scrollbar-thumb { background: var(--border-dark); border-radius: 3px; }
+
+  /* empty state */
+  #empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: var(--text-muted);
+  }
+
+  #empty-state .es-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 4px;
+  }
+
+  #empty-state p { font-size: 14px; color: var(--text-secondary); font-weight: 500; }
+  #empty-state span { font-size: 13px; color: var(--text-muted); text-align: center; max-width: 300px; }
+
+  /* message bubbles */
+  .msg-row {
+    display: flex;
+    gap: 10px;
+    max-width: 760px;
+  }
+
+  .msg-row.user { flex-direction: row-reverse; align-self: flex-end; }
+  .msg-row.agent { align-self: flex-start; }
+
+  .msg-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .msg-avatar.user-av { background: var(--navy); color: #fff; }
+  .msg-avatar.agent-av { background: var(--blue-light); color: var(--blue); }
+
+  .msg-bubble {
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 14px;
+    line-height: 1.6;
+    max-width: 600px;
+  }
+
+  .msg-bubble.user {
+    background: var(--navy);
+    color: #fff;
+    border-bottom-right-radius: 4px;
+  }
+
+  .msg-bubble.agent {
+    background: var(--surface);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 4px;
+  }
+
+  .msg-bubble.agent .msg-sender {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--blue);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* typing indicator */
+  .typing-dots {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    padding: 4px 2px;
+  }
+
+  .typing-dots span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    animation: bounce 1.2s infinite;
+  }
+
+  .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes bounce {
+    0%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-5px); }
+  }
+
+  /* input bar */
+  #input-bar {
+    border-top: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    flex-shrink: 0;
+    background: var(--white);
+  }
+
+  #msg-input {
+    flex: 1;
+    border: 1px solid var(--border-dark);
+    border-radius: var(--radius-lg);
+    padding: 10px 14px;
+    font-family: var(--font);
+    font-size: 14px;
+    color: var(--text-primary);
+    resize: none;
+    outline: none;
+    min-height: 42px;
+    max-height: 140px;
+    line-height: 1.5;
+    transition: border-color 0.15s;
+    background: var(--white);
+  }
+
+  #msg-input:focus { border-color: var(--blue); }
+  #msg-input::placeholder { color: var(--text-muted); }
+
+  #send-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: var(--navy);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s, opacity 0.15s;
+  }
+
+  #send-btn:hover { background: var(--navy-hover); }
+  #send-btn:disabled { opacity: 0.4; cursor: default; }
+
+  /* ── GATE ── */
+  #gate {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 28, 46, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    backdrop-filter: blur(4px);
+  }
+
+  #gate-card {
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    padding: 36px 40px;
+    width: 380px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  }
+
+  #gate-card .g-logo {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--blue);
+    margin-bottom: 16px;
+  }
+
+  #gate-card h2 {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+  }
+
+  #gate-card p {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+    line-height: 1.6;
+  }
+
+  #gate-card label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+  }
+
+  #gate-name-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-dark);
+    border-radius: var(--radius);
+    font-family: var(--font);
+    font-size: 14px;
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  #gate-name-input:focus { border-color: var(--blue); }
+
+  #gate-submit {
+    width: 100%;
+    margin-top: 16px;
+    padding: 11px;
+    background: var(--navy);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    font-family: var(--font);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  #gate-submit:hover { background: var(--navy-hover); }
+
+  /* ── CONFIG NOTICE ── */
+  #config-notice {
+    background: #FFF7ED;
+    border: 1px solid #FED7AA;
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    font-size: 12px;
+    color: #9A3412;
+    margin: 0 24px 0;
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    flex-shrink: 0;
+  }
+
+  #config-notice.hidden { display: none; }
+
+  /* context doc viewer */
+  #ctx-viewer {
+    position: fixed;
+    inset: 0;
+    background: rgba(15,28,46,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 90;
+    backdrop-filter: blur(2px);
+  }
+
+  #ctx-viewer.hidden { display: none; }
+
+  #ctx-viewer-card {
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    width: 600px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    overflow: hidden;
+  }
+
+  #ctx-viewer-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  #ctx-viewer-header h3 { font-size: 15px; font-weight: 600; flex: 1; }
+
+  #ctx-viewer-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    padding: 4px;
+    border-radius: 4px;
+    font-size: 18px;
+    line-height: 1;
+    transition: color 0.15s;
+  }
+
+  #ctx-viewer-close:hover { color: var(--text-primary); }
+
+  #ctx-viewer-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    font-family: 'Courier New', monospace;
+  }
+
+  #ctx-viewer-footer {
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .btn-ghost {
+    padding: 7px 14px;
+    background: none;
+    border: 1px solid var(--border-dark);
+    border-radius: var(--radius);
+    font-family: var(--font);
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: background 0.15s;
+  }
+  .btn-ghost:hover { background: var(--surface); }
+
+  .btn-danger {
+    padding: 7px 14px;
+    background: none;
+    border: 1px solid #FECACA;
+    border-radius: var(--radius);
+    font-family: var(--font);
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--red);
+    transition: background 0.15s;
+  }
+  .btn-danger:hover { background: var(--red-bg); }
+</style>
+</head>
+<body>
+
+<!-- ── GATE ── -->
+<div id="gate">
+  <div id="gate-card">
+    <div class="g-logo">Ops Agent</div>
+    <h2>Bem-vindo</h2>
+    <p>Informe seu nome para continuar. Seus chats e contexto ficam salvos localmente neste navegador.</p>
+    <label for="gate-name-input">Seu nome</label>
+    <input id="gate-name-input" type="text" placeholder="Ex: Ana, Carlos..." autocomplete="off" maxlength="40" />
+    <button id="gate-submit">Entrar</button>
+  </div>
+</div>
+
+<!-- ── CONTEXT DOC VIEWER ── -->
+<div id="ctx-viewer" class="hidden">
+  <div id="ctx-viewer-card">
+    <div id="ctx-viewer-header">
+      <h3>Documento de Contexto</h3>
+      <button id="ctx-viewer-close">×</button>
+    </div>
+    <div id="ctx-viewer-body"></div>
+    <div id="ctx-viewer-footer">
+      <button class="btn-danger" id="ctx-delete-btn">Excluir documento</button>
+      <button class="btn-ghost" id="ctx-close-btn">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── SIDEBAR ── -->
+<div id="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-logo">Ops Agent</div>
+    <div class="sidebar-sub">Plataforma de governança</div>
+  </div>
+
+  <div id="identity-section">
+    <div id="identity-label">Usuário ativo</div>
+    <div id="identity-display">
+      <div class="avatar" id="user-avatar">--</div>
+      <span id="identity-name">—</span>
+      <button id="change-user-btn" title="Trocar usuário">↩</button>
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Agentes</div>
+
+    <div class="agent-item" id="agent1-item">
+      <div class="agent-dot dot-pending" id="agent1-dot"></div>
+      <span class="agent-name dimmed" id="agent1-name">Agente de Onboarding</span>
+      <span class="agent-badge badge-pending" id="agent1-badge">pendente</span>
+    </div>
+
+    <div class="agent-item" id="agent2-item">
+      <div class="agent-dot dot-locked" id="agent2-dot"></div>
+      <span class="agent-name dimmed" id="agent2-name">Gerente Operacional</span>
+      <span class="agent-badge badge-locked" id="agent2-badge">bloqueado</span>
+    </div>
+  </div>
+
+  <button id="new-chat-btn">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+    Novo chat
+  </button>
+
+  <div id="chat-list"></div>
+
+  <!-- context doc link -->
+  <div style="padding: 10px 16px; border-top: 1px solid var(--navy-light);">
+    <button id="view-ctx-btn" style="background:none;border:none;cursor:pointer;font-family:var(--font);font-size:11px;color:var(--text-sidebar-muted);display:flex;align-items:center;gap:6px;width:100%;padding:4px 0;transition:color 0.15s;"
+      onmouseover="this.style.color='#CBD5E1'" onmouseout="this.style.color='var(--text-sidebar-muted)'">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <span id="view-ctx-label">Documento de contexto</span>
+    </button>
+  </div>
+</div>
+
+<!-- ── MAIN ── -->
+<div id="main">
+  <div id="topbar">
+    <span id="chat-title">Selecione ou inicie um chat</span>
+    <span id="chat-tag" class="topbar-tag" style="display:none;"></span>
+    <span id="context-status" class="context-status ctx-missing" style="display:none;"></span>
+  </div>
+
+  <div id="config-notice" class="hidden">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <span>Configure a chave da API do Groq em <code style="background:#FEF3C7;padding:1px 4px;border-radius:3px;">GROQ_API_KEY</code> no topo do script antes de usar.</span>
+  </div>
+
+  <div id="messages">
+    <div id="empty-state">
+      <div class="es-icon">
+        <svg width="22" height="22" fill="none" stroke="#94A3B8" stroke-width="1.5" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </div>
+      <p id="empty-title">Nenhum chat aberto</p>
+      <span id="empty-sub">Clique em "Novo chat" para começar.</span>
+    </div>
+  </div>
+
+  <div id="input-bar">
+    <textarea id="msg-input" rows="1" placeholder="Digite sua mensagem…" disabled></textarea>
+    <button id="send-btn" disabled aria-label="Enviar">
+      <svg width="16" height="16" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  CONFIG — paste your Groq API key here
+// ═══════════════════════════════════════════════
+const GROQ_API_KEY = "<<<api-key>>>"; // need to import the key from .env
+const GROQ_MODEL   = "llama-3.3-70b-versatile";
+const GROQ_URL     = "https://api.groq.com/openai/v1/chat/completions";
+
+// ═══════════════════════════════════════════════
+//  AGENT SYSTEM PROMPTS
+// ═══════════════════════════════════════════════
+
+function getAgent1SystemPrompt() {
+  return `<<<researcher-prompt>>>`;
+}
+
+function getAgent2SystemPrompt(userName, contextDoc) {
+  return `<<<manager-prompt>>>`;
+}
+
+// ═══════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════
+
+let currentUser = null;
+let chats       = {};     // { id: { id, title, type, messages: [] } }
+let activeChatId = null;
+let isStreaming   = false;
+
+// ═══════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════
+
+function storageKey(suffix) { return `ops_agent_${currentUser}_${suffix}`; }
+function ctxKey()           { return `ops_ctx`; }
+
+function getContextDoc() {
+  return localStorage.getItem(ctxKey()) || null;
+}
+
+function saveContextDoc(doc) {
+  localStorage.setItem(ctxKey(), doc);
+}
+
+function deleteContextDoc() {
+  localStorage.removeItem(ctxKey());
+}
+
+function loadChats() {
+  const raw = localStorage.getItem(storageKey("chats"));
+  chats = raw ? JSON.parse(raw) : {};
+}
+
+function saveChats() {
+  localStorage.setItem(storageKey("chats"), JSON.stringify(chats));
+}
+
+function initials(name) {
+  return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
+}
+
+function generateId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+function updateAgentStatus() {
+  const hasCtx = !!getContextDoc();
+
+  const a1dot   = document.getElementById("agent1-dot");
+  const a1name  = document.getElementById("agent1-name");
+  const a1badge = document.getElementById("agent1-badge");
+  const a1item  = document.getElementById("agent1-item");
+
+  const a2dot   = document.getElementById("agent2-dot");
+  const a2name  = document.getElementById("agent2-name");
+  const a2badge = document.getElementById("agent2-badge");
+  const a2item  = document.getElementById("agent2-item");
+
+  const ctxLabel = document.getElementById("view-ctx-label");
+
+  if (hasCtx) {
+    // Agent 1 — locked
+    a1dot.className   = "agent-dot dot-locked";
+    a1name.className  = "agent-name dimmed";
+    a1badge.className = "agent-badge badge-locked";
+    a1badge.textContent = "concluído";
+    a1item.classList.remove("active-agent");
+
+    // Agent 2 — active
+    a2dot.className   = "agent-dot dot-active";
+    a2name.className  = "agent-name";
+    a2badge.className = "agent-badge badge-active";
+    a2badge.textContent = "ativo";
+    a2item.classList.add("active-agent");
+
+    ctxLabel.textContent = "Ver documento de contexto";
+  } else {
+    // Agent 1 — active/pending
+    a1dot.className   = "agent-dot dot-pending";
+    a1name.className  = "agent-name";
+    a1badge.className = "agent-badge badge-pending";
+    a1badge.textContent = "aguardando";
+    a1item.classList.add("active-agent");
+
+    // Agent 2 — locked
+    a2dot.className   = "agent-dot dot-locked";
+    a2name.className  = "agent-name dimmed";
+    a2badge.className = "agent-badge badge-locked";
+    a2badge.textContent = "bloqueado";
+    a2item.classList.remove("active-agent");
+
+    ctxLabel.textContent = "Documento de contexto";
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  CHAT LIST RENDER
+// ═══════════════════════════════════════════════
+
+function renderChatList() {
+  const list  = document.getElementById("chat-list");
+  const ids   = Object.keys(chats).sort((a,b) => b - a);
+  const hasCtx = !!getContextDoc();
+
+  list.innerHTML = "";
+
+  if (ids.length === 0) {
+    list.innerHTML = `<div class="chat-list-label">Sem histórico</div>`;
+    return;
+  }
+
+  list.innerHTML = `<div class="chat-list-label">Histórico</div>`;
+
+  ids.forEach(id => {
+    const chat = chats[id];
+    const isSelected = id === activeChatId;
+    const typeLabel = chat.type === "onboarding" ? "Onboarding" : "Ops";
+
+    const item = document.createElement("div");
+    item.className = `chat-item${isSelected ? " selected" : ""}`;
+    item.dataset.id = id;
+
+    const iconPath = chat.type === "onboarding"
+      ? `<circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>`
+      : `<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-4 0v2M12 12v4M10 14h4"/>`;
+
+    item.innerHTML = `
+      <div class="chat-item-icon">
+        <svg width="14" height="14" fill="none" stroke="${chat.type === 'onboarding' ? '#FCD34D' : '#60A5FA'}" stroke-width="1.8" viewBox="0 0 24 24">${iconPath}</svg>
+      </div>
+      <span class="chat-item-title">${escapeHtml(chat.title)}</span>
+      <span class="chat-item-type">${typeLabel}</span>
+      <button class="chat-delete-btn" data-del="${id}" title="Excluir chat" aria-label="Excluir chat">
+        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>`;
+
+    item.addEventListener("click", (e) => {
+      if (e.target.closest("[data-del]")) return;
+      openChat(id);
+    });
+
+    item.querySelector("[data-del]").addEventListener("click", (e) => {
+      e.stopPropagation();
+      deleteChat(id);
+    });
+
+    list.appendChild(item);
+  });
+}
+
+// ═══════════════════════════════════════════════
+//  OPEN / CREATE CHAT
+// ═══════════════════════════════════════════════
+
+function openChat(id) {
+  activeChatId = id;
+  const chat = chats[id];
+  renderChatList();
+  renderMessages(chat);
+  updateTopbar(chat);
+  enableInput();
+}
+
+function createNewChat() {
+  const hasCtx = !!getContextDoc();
+  const type   = hasCtx ? "ops" : "onboarding";
+
+  const id = generateId();
+  const title = type === "onboarding"
+    ? `Onboarding — ${new Date().toLocaleDateString("pt-BR")}`
+    : `Chat Ops — ${new Date().toLocaleDateString("pt-BR")} ${new Date().toLocaleTimeString("pt-BR", {hour:"2-digit",minute:"2-digit"})}`;
+
+  chats[id] = { id, title, type, messages: [] };
+  saveChats();
+  openChat(id);
+
+  if (type === "onboarding") {
+    sendAgentGreeting(id);
+  } else {
+    sendOpsGreeting(id);
+  }
+}
+
+function deleteChat(id) {
+  delete chats[id];
+  saveChats();
+  if (activeChatId === id) {
+    activeChatId = null;
+    clearMain();
+  }
+  renderChatList();
+}
+
+// ═══════════════════════════════════════════════
+//  TOPBAR
+// ═══════════════════════════════════════════════
+
+function updateTopbar(chat) {
+  const hasCtx = !!getContextDoc();
+  const titleEl  = document.getElementById("chat-title");
+  const tagEl    = document.getElementById("chat-tag");
+  const ctxEl    = document.getElementById("context-status");
+
+  titleEl.textContent = chat.title;
+
+  tagEl.style.display = "inline-flex";
+  if (chat.type === "onboarding") {
+    tagEl.className = "topbar-tag tag-onboarding";
+    tagEl.textContent = "Onboarding";
+  } else {
+    tagEl.className = "topbar-tag tag-ops";
+    tagEl.textContent = "Gerente Operacional";
+  }
+
+  ctxEl.style.display = "inline-flex";
+  if (hasCtx) {
+    ctxEl.className = "context-status ctx-ready";
+    ctxEl.innerHTML = `<svg width="10" height="10" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg> Contexto ativo`;
+  } else {
+    ctxEl.className = "context-status ctx-missing";
+    ctxEl.innerHTML = `<svg width="10" height="10" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg> Sem contexto`;
+  }
+}
+
+function clearMain() {
+  document.getElementById("chat-title").textContent = "Selecione ou inicie um chat";
+  document.getElementById("chat-tag").style.display = "none";
+  document.getElementById("context-status").style.display = "none";
+  document.getElementById("messages").innerHTML = `
+    <div id="empty-state">
+      <div class="es-icon">
+        <svg width="22" height="22" fill="none" stroke="#94A3B8" stroke-width="1.5" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </div>
+      <p id="empty-title">Nenhum chat aberto</p>
+      <span id="empty-sub">Clique em "Novo chat" para começar.</span>
+    </div>`;
+  document.getElementById("msg-input").disabled = true;
+  document.getElementById("send-btn").disabled  = true;
+}
+
+// ═══════════════════════════════════════════════
+//  MESSAGES RENDER
+// ═══════════════════════════════════════════════
+
+function escapeHtml(str) {
+  return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function formatMarkdown(text) {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/`(.+?)`/g, "<code>$1</code>")
+    .replace(/^#{3}\s(.+)$/gm, "<h4 style='margin:8px 0 4px;font-size:13px;font-weight:600;color:#0F172A'>$1</h4>")
+    .replace(/^#{2}\s(.+)$/gm, "<h3 style='margin:10px 0 5px;font-size:14px;font-weight:600;color:#0F172A'>$1</h3>")
+    .replace(/^#{1}\s(.+)$/gm, "<h2 style='margin:12px 0 6px;font-size:15px;font-weight:600;color:#0F172A'>$1</h2>")
+    .replace(/^[-•]\s(.+)$/gm, "<li style='margin:2px 0 2px 16px'>$1</li>")
+    .replace(/\n/g, "<br>");
+}
+
+function renderMessages(chat) {
+  const container = document.getElementById("messages");
+  container.innerHTML = "";
+
+  if (chat.messages.length === 0) {
+    container.innerHTML = `<div id="empty-state" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#94A3B8">
+      <svg width="28" height="28" fill="none" stroke="#CBD5E1" stroke-width="1.5" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <span style="font-size:13px;color:#94A3B8">Aguardando resposta do agente…</span>
+    </div>`;
+    return;
+  }
+
+  chat.messages.forEach(msg => appendMessage(msg, false));
+  scrollToBottom();
+}
+
+function appendMessage(msg, scroll=true) {
+  const container = document.getElementById("messages");
+  const empState  = container.querySelector("#empty-state");
+  if (empState) empState.remove();
+
+  const isUser = msg.role === "user";
+  const userInitials = initials(currentUser);
+
+  const row = document.createElement("div");
+  row.className = `msg-row ${isUser ? "user" : "agent"}`;
+
+  const avatarLabel = isUser ? userInitials : "AG";
+  const avatarClass = isUser ? "user-av" : "agent-av";
+  const senderName  = isUser ? "" : (activeChatId && chats[activeChatId]?.type === "onboarding" ? "Agente Onboarding" : "Gerente Operacional");
+
+  const content = isUser
+    ? `<div class="msg-bubble user">${escapeHtml(msg.content)}</div>`
+    : `<div class="msg-bubble agent"><div class="msg-sender">${senderName}</div>${formatMarkdown(msg.content)}</div>`;
+
+  row.innerHTML = `
+    <div class="msg-avatar ${avatarClass}">${avatarLabel}</div>
+    ${content}`;
+
+  container.appendChild(row);
+  if (scroll) scrollToBottom();
+}
+
+function scrollToBottom() {
+  const c = document.getElementById("messages");
+  c.scrollTop = c.scrollHeight;
+}
+
+function showTyping() {
+  const container = document.getElementById("messages");
+  const empState  = container.querySelector("#empty-state");
+  if (empState) empState.remove();
+
+  const row = document.createElement("div");
+  row.className = "msg-row agent";
+  row.id = "typing-row";
+  const chat = chats[activeChatId];
+  const name = chat?.type === "onboarding" ? "Agente Onboarding" : "Gerente Operacional";
+  row.innerHTML = `
+    <div class="msg-avatar agent-av">AG</div>
+    <div class="msg-bubble agent">
+      <div class="msg-sender">${name}</div>
+      <div class="typing-dots"><span></span><span></span><span></span></div>
+    </div>`;
+  container.appendChild(row);
+  scrollToBottom();
+  return row;
+}
+
+function removeTyping() {
+  const row = document.getElementById("typing-row");
+  if (row) row.remove();
+}
+
+// ═══════════════════════════════════════════════
+//  INPUT
+// ═══════════════════════════════════════════════
+
+function enableInput() {
+  document.getElementById("msg-input").disabled = false;
+  document.getElementById("send-btn").disabled  = false;
+  document.getElementById("msg-input").focus();
+}
+
+function disableInput() {
+  document.getElementById("msg-input").disabled = true;
+  document.getElementById("send-btn").disabled  = true;
+}
+
+// ═══════════════════════════════════════════════
+//  API CALL
+// ═══════════════════════════════════════════════
+
+async function callGroq(messages) {
+  if (!GROQ_API_KEY) {
+    return "[Erro: GROQ_API_KEY não configurada. Abra o arquivo HTML e cole sua chave no topo do script.]";
+  }
+
+  try {
+    const res = await fetch(GROQ_URL, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${GROQ_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        messages,
+        temperature: 0.7,
+        max_tokens: 1500,
+        stream: false
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return `[Erro da API: ${res.status} — ${err.error?.message || "Erro desconhecido"}]`;
+    }
+
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content || "[Resposta vazia do modelo]";
+  } catch (e) {
+    return `[Erro de rede: ${e.message}]`;
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  AGENT GREETINGS
+// ═══════════════════════════════════════════════
+
+async function sendAgentGreeting(chatId) {
+  disableInput();
+  const typingRow = showTyping();
+
+  const systemPrompt = getAgent1SystemPrompt();
+  const intro = [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: `Olá, meu nome é ${currentUser}.` }
+  ];
+
+  const reply = await callGroq(intro);
+  removeTyping();
+
+  if (!chats[chatId]) return;
+
+  chats[chatId].messages.push({ role: "user",      content: `Olá, meu nome é ${currentUser}.` });
+  chats[chatId].messages.push({ role: "assistant", content: reply });
+  saveChats();
+
+  appendMessage({ role: "assistant", content: reply });
+  enableInput();
+
+  checkForContextDoc(chatId, reply);
+}
+
+async function sendOpsGreeting(chatId) {
+  disableInput();
+  const typingRow = showTyping();
+
+  const ctx = getContextDoc();
+  const systemPrompt = getAgent2SystemPrompt(currentUser, ctx);
+  const intro = [
+    { role: "system", content: systemPrompt },
+    { role: "user",   content: `[QUEM ESTÁ FALANDO]: ` + currentUser + ` [DOCUMENTO_DE_CONTEXTO]: ` + ctx + ` [MESSAGE]: Olá.` }
+  ];
+
+  const reply = await callGroq(intro);
+  removeTyping();
+
+  if (!chats[chatId]) return;
+
+  chats[chatId].messages.push({ role: "user",   content: `[QUEM ESTÁ FALANDO]: ` + currentUser + ` [DOCUMENTO_DE_CONTEXTO]: ` + ctx + ` [MESSAGE]: Olá.` });
+  chats[chatId].messages.push({ role: "assistant", content: reply });
+  saveChats();
+
+  appendMessage({ role: "assistant", content: reply });
+  enableInput();
+}
+
+// ═══════════════════════════════════════════════
+//  SEND MESSAGE
+// ═══════════════════════════════════════════════
+
+async function sendMessage() {
+  if (isStreaming || !activeChatId) return;
+  const input   = document.getElementById("msg-input");
+  const content = input.value.trim();
+  if (!content) return;
+
+  input.value = "";
+  input.style.height = "auto";
+
+  const chat = chats[activeChatId];
+  chat.messages.push({ role: "user", content });
+  saveChats();
+  appendMessage({ role: "user", content });
+
+  isStreaming = true;
+  disableInput();
+  const typingRow = showTyping();
+
+  let apiMessages;
+
+  if (chat.type === "onboarding") {
+    apiMessages = [
+      { role: "system", content: getAgent1SystemPrompt() },
+      ...chat.messages.map(m => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }))
+    ];
+  } else {
+    const ctx = getContextDoc();
+    apiMessages = [
+      { role: "system", content: getAgent2SystemPrompt(currentUser, ctx) },
+      ...chat.messages.map(m => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }))
+    ];
+  }
+
+  const reply = await callGroq(apiMessages);
+  removeTyping();
+
+  if (!chats[activeChatId]) { isStreaming = false; return; }
+
+  chats[activeChatId].messages.push({ role: "assistant", content: reply });
+  saveChats();
+  appendMessage({ role: "assistant", content: reply });
+
+  isStreaming = false;
+  enableInput();
+
+  if (chat.type === "onboarding") {
+    checkForContextDoc(activeChatId, reply);
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  CONTEXT DOC DETECTION
+// ═══════════════════════════════════════════════
+
+function checkForContextDoc(chatId, text) {
+  const startMarker = "===DOCUMENTO_DE_CONTEXTO_INICIO===";
+  const endMarker   = "===DOCUMENTO_DE_CONTEXTO_FIM===";
+ 
+  const startIdx = text.indexOf(startMarker);
+  const endIdx   = text.indexOf(endMarker);
+ 
+  if (startIdx === -1 || endIdx === -1) return;
+ 
+  const doc = text.slice(startIdx + startMarker.length, endIdx).trim();
+  saveContextDoc(doc);
+
+  updateAgentStatus();
+  updateTopbar(chats[chatId]);
+  renderChatList();
+
+  // show confirmation in chat
+  setTimeout(() => {
+    const notif = document.createElement("div");
+    notif.style.cssText = "display:flex;align-items:center;gap:10px;background:#ECFDF5;border:1px solid #A7F3D0;border-radius:8px;padding:10px 14px;font-size:13px;color:#065F46;margin:4px 0;";
+    notif.innerHTML = `<svg width="16" height="16" fill="none" stroke="#059669" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      <span><strong>Documento de contexto gerado.</strong> O Gerente Operacional já está disponível.</span>`;
+    document.getElementById("messages").appendChild(notif);
+    scrollToBottom();
+  }, 300);
+}
+
+// ═══════════════════════════════════════════════
+//  CONTEXT DOC VIEWER
+// ═══════════════════════════════════════════════
+
+function openCtxViewer() {
+  const doc = getContextDoc();
+  if (!doc) return;
+  document.getElementById("ctx-viewer-body").textContent = doc;
+  document.getElementById("ctx-viewer").classList.remove("hidden");
+}
+
+function closeCtxViewer() {
+  document.getElementById("ctx-viewer").classList.add("hidden");
+}
+
+// ═══════════════════════════════════════════════
+//  USER LOGIN
+// ═══════════════════════════════════════════════
+
+function loginUser(name) {
+  currentUser = name.trim();
+  localStorage.setItem("ops_agent_current_user", currentUser);
+
+  document.getElementById("gate").style.display = "none";
+  document.getElementById("user-avatar").textContent = initials(currentUser);
+  document.getElementById("identity-name").textContent = currentUser;
+
+  const noKey = !GROQ_API_KEY;
+  if (noKey) {
+    document.getElementById("config-notice").classList.remove("hidden");
+  }
+
+  loadChats();
+  updateAgentStatus();
+  renderChatList();
+  clearMain();
+}
+
+// ═══════════════════════════════════════════════
+//  EVENTS
+// ═══════════════════════════════════════════════
+
+// Gate
+document.getElementById("gate-submit").addEventListener("click", () => {
+  const name = document.getElementById("gate-name-input").value.trim();
+  if (!name) return;
+  loginUser(name);
+});
+
+document.getElementById("gate-name-input").addEventListener("keydown", e => {
+  if (e.key === "Enter") document.getElementById("gate-submit").click();
+});
+
+// Change user
+document.getElementById("change-user-btn").addEventListener("click", () => {
+  activeChatId = null;
+  clearMain();
+  document.getElementById("gate-name-input").value = "";
+  document.getElementById("gate").style.display = "flex";
+});
+
+// New chat
+document.getElementById("new-chat-btn").addEventListener("click", () => {
+  if (!currentUser) return;
+  createNewChat();
+});
+
+// Send
+document.getElementById("send-btn").addEventListener("click", sendMessage);
+
+document.getElementById("msg-input").addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+// Auto-resize textarea
+document.getElementById("msg-input").addEventListener("input", function() {
+  this.style.height = "auto";
+  this.style.height = Math.min(this.scrollHeight, 140) + "px";
+});
+
+// Context doc viewer
+document.getElementById("view-ctx-btn").addEventListener("click", () => {
+  const doc = getContextDoc();
+  if (doc) {
+    openCtxViewer();
+  }
+});
+
+document.getElementById("ctx-viewer-close").addEventListener("click", closeCtxViewer);
+document.getElementById("ctx-close-btn").addEventListener("click", closeCtxViewer);
+document.getElementById("ctx-viewer").addEventListener("click", e => {
+  if (e.target === document.getElementById("ctx-viewer")) closeCtxViewer();
+});
+
+document.getElementById("ctx-delete-btn").addEventListener("click", () => {
+  if (!confirm("Excluir o documento de contexto? O Gerente Operacional ficará bloqueado até um novo onboarding.")) return;
+  deleteContextDoc();
+  closeCtxViewer();
+  updateAgentStatus();
+  if (activeChatId) updateTopbar(chats[activeChatId]);
+  renderChatList();
+});
+
+// Auto-login if returning user
+window.addEventListener("load", () => {
+  const saved = localStorage.getItem("ops_agent_current_user");
+  if (saved) loginUser(saved);
+});
+</script>
+</body>
+</html>
