@@ -17,7 +17,7 @@ class Settings(BaseSettings):
 settings = Settings()
 app = FastAPI()
 
-app.mount("/", StaticFiles(directory="../front", html=True), name="static")
+app.mount("/", StaticFiles(directory="./front", html=True), name="static")
 
 @app.get("/health")
 async def health():
