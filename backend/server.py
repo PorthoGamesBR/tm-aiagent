@@ -1,24 +1,30 @@
 from fastapi import FastAPI
-from pydantic_settings import BaseSettings, SettingsConfigDict
+
 from fastapi.staticfiles import StaticFiles
+from contextlib import asynccontextmanager
+from bootstrap import Application
 
+class Server:
+    @asynccontextmanager
+    async def lifespan(self, app: FastAPI):
+        app.state.application = Application()
+        yield
+        
+    async def health(self):
+        return {"status": "ok"}
 
-class Settings(BaseSettings):
-    groq_key: str
-    jwt_secret: str
-    database_provider: str = "firebase"
-    firebase_project_id: str | None = None
+    
+    def create_app(self):
+        self.app = FastAPI(
+            lifespan=self.lifespan
+        )
+        self.app.mount(
+            "/",
+            StaticFiles(directory="./front", html=True),
+            name="static"
+        )
+        self.app.get("/health")(self.health)
+        return self.app
 
-    model_config = SettingsConfigDict(
-        env_file=".env"
-    )
-
-
-settings = Settings()
-app = FastAPI()
-
-app.mount("/", StaticFiles(directory="./front", html=True), name="static")
-
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
+server = Server()
+app = server.create_app()
