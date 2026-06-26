@@ -25,6 +25,7 @@ let currentUser = null;
 let chats       = {};     // { id: { id, title, type, messages: [] } }
 let activeChatId = null;
 let isStreaming   = false;
+let contextDoc = null;
 
 // ═══════════════════════════════════════════════
 //  HELPERS
@@ -33,8 +34,33 @@ let isStreaming   = false;
 function storageKey(suffix) { return `ops_agent_${currentUser}_${suffix}`; }
 function ctxKey()           { return `ops_ctx`; }
 
-function getContextDoc() {
-  return localStorage.getItem(ctxKey()) || null;
+async function get_endpoint(endpoint_url){
+  try {
+    const response = await fetch(endpoint_url); // Relative path automatically points to the same server
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching local data:', error);
+    return null;
+  }
+}
+
+async function getContextDoc() {
+  try {
+    const response = await get_endpoint("/api/contextdoc");
+    // Safely pull the content, or set to null if it doesn't exist
+    contextDoc = response ? response["content"] : null;
+  } catch (error) {
+    console.error("Failed to fetch context document:", error);
+    contextDoc = null; 
+  }
+}
+
+function isContextDocAvailable() {
+  if (contextDoc !== null) {
+    return true;
+  }
+  return false;
 }
 
 function saveContextDoc(doc) {
@@ -62,16 +88,7 @@ function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
 
-async function get_endpoint(endpoint_url){
-  try {
-    const response = await fetch(endpoint_url); // Relative path automatically points to the same server
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Error fetching local data:', error);
-    return null;
-  }
-}
+
 
 async function updateAgentStatus() {
   // TODO: Add call to endpoint /agents
@@ -131,7 +148,7 @@ async function updateAgentStatus() {
 function renderChatList() {
   const list  = document.getElementById("chat-list");
   const ids   = Object.keys(chats).sort((a,b) => b - a);
-  const hasCtx = !!getContextDoc();
+  const hasCtx = isContextDocAvailable();
 
   list.innerHTML = "";
 
@@ -193,7 +210,7 @@ function openChat(id) {
 }
 
 function createNewChat() {
-  const hasCtx = !!getContextDoc();
+  const hasCtx = isContextDocAvailable();
   const type   = hasCtx ? "ops" : "onboarding";
 
   const id = generateId();
@@ -227,7 +244,7 @@ function deleteChat(id) {
 // ═══════════════════════════════════════════════
 
 function updateTopbar(chat) {
-  const hasCtx = !!getContextDoc();
+  const hasCtx = isContextDocAvailable();
   const titleEl  = document.getElementById("chat-title");
   const tagEl    = document.getElementById("chat-tag");
   const ctxEl    = document.getElementById("context-status");
@@ -448,7 +465,7 @@ async function sendOpsGreeting(chatId) {
   disableInput();
   const typingRow = showTyping();
 
-  const ctx = getContextDoc();
+  const ctx = contextDoc;
   const systemPrompt = getAgent2SystemPrompt(currentUser, ctx);
   const intro = [
     { role: "system", content: systemPrompt },
@@ -498,7 +515,7 @@ async function sendMessage() {
       ...chat.messages.map(m => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }))
     ];
   } else {
-    const ctx = getContextDoc();
+    const ctx = contextDoc;
     apiMessages = [
       { role: "system", content: getAgent2SystemPrompt(currentUser, ctx) },
       ...chat.messages.map(m => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }))
@@ -558,7 +575,7 @@ function checkForContextDoc(chatId, text) {
 // ═══════════════════════════════════════════════
 
 function openCtxViewer() {
-  const doc = getContextDoc();
+  const doc = contextDoc;
   if (!doc) return;
   document.getElementById("ctx-viewer-body").textContent = doc;
   document.getElementById("ctx-viewer").classList.remove("hidden");
@@ -572,7 +589,7 @@ function closeCtxViewer() {
 //  USER LOGIN
 // ═══════════════════════════════════════════════
 
-function loginUser(name) {
+async function loginUser(name) {
   currentUser = name.trim();
   localStorage.setItem("ops_agent_current_user", currentUser);
 
@@ -585,8 +602,9 @@ function loginUser(name) {
     document.getElementById("config-notice").classList.remove("hidden");
   }
 
+  await getContextDoc();
   loadChats();
-  updateAgentStatus();
+  await updateAgentStatus();
   renderChatList();
   clearMain();
 }
@@ -638,8 +656,7 @@ document.getElementById("msg-input").addEventListener("input", function() {
 
 // Context doc viewer
 document.getElementById("view-ctx-btn").addEventListener("click", () => {
-  const doc = getContextDoc();
-  if (doc) {
+  if (isContextDocAvailable()) {
     openCtxViewer();
   }
 });
