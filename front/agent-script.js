@@ -62,8 +62,20 @@ function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
 
-function updateAgentStatus() {
-  const hasCtx = !!getContextDoc();
+async function get_endpoint(endpoint_url){
+  try {
+    const response = await fetch(endpoint_url); // Relative path automatically points to the same server
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching local data:', error);
+    return null;
+  }
+}
+
+async function updateAgentStatus() {
+  // TODO: Add call to endpoint /agents
+  const agentStatus = await get_endpoint("/api/agents");
 
   const a1dot   = document.getElementById("agent1-dot");
   const a1name  = document.getElementById("agent1-name");
@@ -77,24 +89,8 @@ function updateAgentStatus() {
 
   const ctxLabel = document.getElementById("view-ctx-label");
 
-  if (hasCtx) {
-    // Agent 1 — locked
-    a1dot.className   = "agent-dot dot-locked";
-    a1name.className  = "agent-name dimmed";
-    a1badge.className = "agent-badge badge-locked";
-    a1badge.textContent = "concluído";
-    a1item.classList.remove("active-agent");
-
-    // Agent 2 — active
-    a2dot.className   = "agent-dot dot-active";
-    a2name.className  = "agent-name";
-    a2badge.className = "agent-badge badge-active";
-    a2badge.textContent = "ativo";
-    a2item.classList.add("active-agent");
-
-    ctxLabel.textContent = "Ver documento de contexto";
-  } else {
-    // Agent 1 — active/pending
+  if (agentStatus['researcher']['status'] === 'available') {
+     // Agent 1 — active/pending
     a1dot.className   = "agent-dot dot-pending";
     a1name.className  = "agent-name";
     a1badge.className = "agent-badge badge-pending";
@@ -109,6 +105,22 @@ function updateAgentStatus() {
     a2item.classList.remove("active-agent");
 
     ctxLabel.textContent = "Documento de contexto";
+  }else if (agentStatus['manager']['status'] === 'available'){
+        // Agent 1 — locked
+    a1dot.className   = "agent-dot dot-locked";
+    a1name.className  = "agent-name dimmed";
+    a1badge.className = "agent-badge badge-locked";
+    a1badge.textContent = "concluído";
+    a1item.classList.remove("active-agent");
+
+    // Agent 2 — active
+    a2dot.className   = "agent-dot dot-active";
+    a2name.className  = "agent-name";
+    a2badge.className = "agent-badge badge-active";
+    a2badge.textContent = "ativo";
+    a2item.classList.add("active-agent");
+
+    ctxLabel.textContent = "Ver documento de contexto";
   }
 }
 
