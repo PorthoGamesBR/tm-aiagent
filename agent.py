@@ -38,7 +38,7 @@ class Agent:
     class models:
         GROQ = "groq"
 
-    def __init__(self, model, key):
+    def __init__(self, model:models, key:str):
         self.model = model
         self.api_key = key
         self.agent = self.instantiate_agent()
@@ -70,9 +70,9 @@ class Agent:
         
         return llm
     
-    def send_message(self, message):
+    def send_message(self, message, message_history = []):
         result = self.agent.invoke(
-            {"messages": [{"role": "user", "content": message}]}
+            {"messages": message_history + [{"role": "user", "content": message}]}
         )
         
         # DEBUG: Remove later

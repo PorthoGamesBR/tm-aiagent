@@ -1,5 +1,6 @@
 import json
 from datetime import datetime, timedelta, timezone
+from agent import Agent
 
 from fastapi import Depends, FastAPI, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
@@ -46,9 +47,10 @@ class AgentAcessPoint:
         AVAILABLE = "available"
         NOT_AVAILABLE = "not available"
         
-    def __init__(self, name):
+    def __init__(self, name, agent):
         self.name = name
         self.status = AgentAcessPoint.AgentStatus.NOT_AVAILABLE
+        self.agent = agent
         
     def set_available(self, available=True):
         self.status = AgentAcessPoint.AgentStatus.AVAILABLE
@@ -90,7 +92,27 @@ class UserDatabase:
             break
         return user
         
+class ChatDatabase:
+    def __init__(self, firestore_client: firestore.Client):
+        # chat_id = unique, every single chat has an id
+        # user = inside the chat document itself. Can be used for filters
+        self.collection = firestore_client.collection('chats')
+            
+    def create_chat_history(self, username: str) -> str:
+        """Returns the chat_id of the newly created chat file"""
+        pass
         
+    def get_chat_history(self, chat_id: str) -> list:
+        # TODO: Get history from doc chat_id
+        pass
+    
+    def save_history(self, chat_id: str, messages: list):
+        # TODO: Update messages field
+        pass
+    
+    def get_chat_id_by_user(self, username: str) -> list:
+        # TODO: Return all doc ids of documents with that username
+        pass
 
 settings = Settings()
 
@@ -102,10 +124,12 @@ firestore_client = firestore.client(firebase_app)
 
 doc_db = DocumentDatabase(firestore_client)
 user_db = UserDatabase(firestore_client)
+chat_db = ChatDatabase(firestore_client)
 
 # Agent Configuration
-researcher_agent = AgentAcessPoint("researcher")
-manager_agent = AgentAcessPoint("manager")
+MODEL = Agent.models.GROQ
+researcher_agent = AgentAcessPoint("researcher", Agent(MODEL, settings.groq_key))
+manager_agent = AgentAcessPoint("manager", Agent(MODEL, settings.groq_key))
 registered_agent_acess_points = [researcher_agent, manager_agent]
 
 # Access Configuration
@@ -183,7 +207,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
 @app.get("/api/user")
 async def get_current_user(request: Request):
-    return {"user": request.current_user}
+    return {"user": request.state.current_user}
 
 @app.get("/api/health")
 async def health():
@@ -201,15 +225,53 @@ async def agents():
 async def contextdoc():
     return {"content": doc_db.get_context_document()}
 
-@app.post("/api/agent/{agent_name}/message")
-async def send_agent_message(agent_name: str, payload: dict):
-    if agent_name == "researcher":
-        # call researcher agent
-        return {"response": "researcher handled it"}
-    elif agent_name == "manager":
-        # call manager agent
-        return {"response": "manager handled it"}
-    else:
-        raise HTTPException(status_code=404, detail="Unknown agent")
+@app.post("/api/contextdoc/save")
+async def contextdoc_save():
+    pass
+
+@app.post("/api/contextdoc/delete")
+async def contextdoc_delete():
+    pass
+
+@app.get("/api/chats")
+async def get_chat_id_from_user(userdata: dict = Depends(get_current_user)):
+    username = userdata["user"]
+    return {"id_list": chat_db.get_chat_id_by_user(username)}
+
+@app.get("/api/history/{chat_id}")
+async def get_chat_history(chat_id: str) -> dict:
+    return {"messages": chat_db.get_chat_history(chat_id)}
+
+@app.post("/api/chat/newchat")
+async def create_new_chat(userdata: dict = Depends(get_current_user)):
+    username = userdata["user"]
+    return {"chat_id": chat_db.create_chat_history(username)}
+
+
+@app.post("/api/chat/{agent_name}/message/{chat_id}")
+async def send_agent_message(agent_name: str, chat_id: str, payload: dict, userdata: dict = Depends(get_current_user)):
+    # TODO: i want this function to get the username from the actual login, not the request, so i can guarantee is the user itself that is sending the message
+    username = userdata["user"]
+    agent = None
+    for agent_acesspoint in registered_agent_acess_points:
+        if agent_acesspoint.name == agent_name:
+            if agent_acesspoint.status != AgentAcessPoint.AgentStatus.AVAILABLE:
+                return JSONResponse(status_code=401, content={"detail":f"agent {agent_name} not available"})
+            agent = agent_acesspoint.agent
+            
+    if agent == None:
+        return JSONResponse(status_code=401, content={"detail":f"Unknow agent {agent_name}"})
+        
+    chat_history = chat_db.get_chat_history(chat_id)
+    formated_message = f"USUARIO: {username} MENSAGEM: { payload['message'] }"
+    try:
+        response = agent.send_message(formated_message, chat_history)
+    except:
+        return JSONResponse(status_code=401, content={"detail":"An error occurred while talking to the agent"})
+    
+    chat_history.append({"role": "user", "content" : payload['message']})
+    chat_history.append({"role": "assistant", "content" : response})
+    chat_db.save_history(chat_id, chat_history)
+    return {"response" : response}
     
 app.mount("/", StaticFiles(directory="./front", html=True), name="static")

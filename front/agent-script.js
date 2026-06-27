@@ -2,6 +2,16 @@ const token = localStorage.getItem('token');
 if (!token) {
   window.location.href = '/';
 }
+loginUser();
+
+// TODO: Change this dependencies to the backend
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+const GROQ_MODEL = "llama-3.3-70b-versatile"
+function storageKey(suffix) { return null }
+function ctxKey() { return null }
+function getAgent1SystemPrompt() { return null }
+function getAgent2SystemPrompt(userName, contextDoc) { return null }
+
 // ═══════════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════════
@@ -16,15 +26,28 @@ let contextDoc = null;
 //  HELPERS
 // ═══════════════════════════════════════════════
 
-function storageKey(suffix) { return `ops_agent_${currentUser}_${suffix}`; }
-function ctxKey()           { return `ops_ctx`; }
-
 async function get_endpoint(endpoint_url){
   try {
     const response = await fetch(endpoint_url, {
   headers: {
     'Authorization': `Bearer ${token}`
   }}); // Relative path automatically points to the same server
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching local data:', error);
+    return null;
+  }
+}
+
+async function post_endpoint(endpoint_url, request){
+  try {
+    const response = await fetch(endpoint_url, {
+    method: "POST",
+    headers: {
+    "Content-Type": "application/json",
+    'Authorization': `Bearer ${token}`},
+    body: JSON.stringify(request)}); // Relative path automatically points to the same server
     const data = await response.json();
     return data;
   } catch (error) {
@@ -577,18 +600,13 @@ function closeCtxViewer() {
 //  USER LOGIN
 // ═══════════════════════════════════════════════
 
-async function loginUser(name) {
-  currentUser = name.trim();
+async function loginUser() {
+  currentUser = (await get_endpoint("/api/user"))["user"]
   localStorage.setItem("ops_agent_current_user", currentUser);
 
   document.getElementById("gate").style.display = "none";
   document.getElementById("user-avatar").textContent = initials(currentUser);
   document.getElementById("identity-name").textContent = currentUser;
-
-  const noKey = !GROQ_API_KEY;
-  if (noKey) {
-    document.getElementById("config-notice").classList.remove("hidden");
-  }
 
   await getContextDoc();
   loadChats();
@@ -600,25 +618,6 @@ async function loginUser(name) {
 // ═══════════════════════════════════════════════
 //  EVENTS
 // ═══════════════════════════════════════════════
-
-// Gate
-document.getElementById("gate-submit").addEventListener("click", () => {
-  const name = document.getElementById("gate-name-input").value.trim();
-  if (!name) return;
-  loginUser(name);
-});
-
-document.getElementById("gate-name-input").addEventListener("keydown", e => {
-  if (e.key === "Enter") document.getElementById("gate-submit").click();
-});
-
-// Change user
-document.getElementById("change-user-btn").addEventListener("click", () => {
-  activeChatId = null;
-  clearMain();
-  document.getElementById("gate-name-input").value = "";
-  document.getElementById("gate").style.display = "flex";
-});
 
 // New chat
 document.getElementById("new-chat-btn").addEventListener("click", () => {
@@ -662,10 +661,4 @@ document.getElementById("ctx-delete-btn").addEventListener("click", () => {
   updateAgentStatus();
   if (activeChatId) updateTopbar(chats[activeChatId]);
   renderChatList();
-});
-
-// Auto-login if returning user
-window.addEventListener("load", () => {
-  const saved = localStorage.getItem("ops_agent_current_user");
-  if (saved) loginUser(saved);
 });
