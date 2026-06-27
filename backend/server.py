@@ -60,24 +60,27 @@ class AgentAcessPoint:
 class DocumentDatabase:
     def __init__(self, firestore_client: firestore.Client):
         self.collection = firestore_client.collection('contextdoc')
+        self._doc_id = "current"
     
     def get_context_document(self) -> str:
-        query = self.collection.limit(1)
-        docs = query.stream()
-        latest_doc = None
-        for doc in docs:
-            latest_doc = doc.to_dict()
-            break  # We only asked for 1, so we can break immediately
-        if not latest_doc:
+        doc_ref = self.collection.document(self._doc_id)
+        doc = doc_ref.get()
+        if not doc.exists:
             return None
-        
-        return latest_doc['content']
+        return doc.to_dict().get("content")
     
     def save_context_document(self, document_text):
-        pass
+        doc_ref = self.collection.document(self._doc_id)
+        doc_ref.set({
+            "content": document_text,
+            "updated_at": firestore.SERVER_TIMESTAMP
+        })
+        return True
     
     def delete_context_document(self):
-        pass
+        doc_ref = self.collection.document(self._doc_id)
+        doc_ref.delete()
+        return True
                 
 class UserDatabase:
     def __init__(self, firestore_client: firestore.Client):
@@ -100,19 +103,33 @@ class ChatDatabase:
             
     def create_chat_history(self, username: str) -> str:
         """Returns the chat_id of the newly created chat file"""
-        pass
+        doc_ref = self.collection.document()
+        doc_ref.set({
+            "username": username,
+            "messages": [],
+            "created_at": firestore.SERVER_TIMESTAMP,
+            "updated_at": firestore.SERVER_TIMESTAMP
+        })
+        return doc_ref.id
         
     def get_chat_history(self, chat_id: str) -> list:
-        # TODO: Get history from doc chat_id
-        pass
+        doc_ref = self.collection.document(chat_id)
+        doc = doc_ref.get()
+        if not doc.exists:
+            return []
+        return doc.to_dict().get("messages", [])
     
     def save_history(self, chat_id: str, messages: list):
-        # TODO: Update messages field
-        pass
+        doc_ref = self.collection.document(chat_id)
+        doc_ref.set({
+            "messages": messages,
+            "updated_at": firestore.SERVER_TIMESTAMP
+        }, merge=True)
+        return True
     
     def get_chat_id_by_user(self, username: str) -> list:
-        # TODO: Return all doc ids of documents with that username
-        pass
+        docs = self.collection.where("username", "==", username).stream()
+        return [doc.id for doc in docs]
 
 settings = Settings()
 
