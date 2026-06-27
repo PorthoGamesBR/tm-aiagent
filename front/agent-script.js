@@ -1,22 +1,7 @@
-// ═══════════════════════════════════════════════
-//  CONFIG — paste your Groq API key here
-// ═══════════════════════════════════════════════
-const GROQ_API_KEY = "<<<api-key>>>"; // need to import the key from .env
-const GROQ_MODEL   = "llama-3.3-70b-versatile";
-const GROQ_URL     = "https://api.groq.com/openai/v1/chat/completions";
-
-// ═══════════════════════════════════════════════
-//  AGENT SYSTEM PROMPTS
-// ═══════════════════════════════════════════════
-
-function getAgent1SystemPrompt() {
-  return `<<<researcher-prompt>>>`;
+const token = localStorage.getItem('token');
+if (!token) {
+  window.location.href = '/';
 }
-
-function getAgent2SystemPrompt(userName, contextDoc) {
-  return `<<<manager-prompt>>>`;
-}
-
 // ═══════════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════════
@@ -36,7 +21,10 @@ function ctxKey()           { return `ops_ctx`; }
 
 async function get_endpoint(endpoint_url){
   try {
-    const response = await fetch(endpoint_url); // Relative path automatically points to the same server
+    const response = await fetch(endpoint_url, {
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }}); // Relative path automatically points to the same server
     const data = await response.json();
     return data;
   } catch (error) {
