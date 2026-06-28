@@ -17,6 +17,8 @@ from firebase_admin import credentials, firestore
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
+from langchain_core.tools import tool
+from groq import RateLimitError
 
 class Settings(BaseSettings):
     groq_key: str
@@ -135,6 +137,25 @@ class ChatDatabase:
 class ContextDocPayload(BaseModel):
     content: str
     
+# Tools for the agent
+@tool
+def save_context_doc_tool(document_text: str) -> str:
+    """
+    Salva o documento de contexto que o agente gerente vai utilizar após.
+    """
+    if not document_text or not document_text.strip():
+        return "Context text is empty. Nothing saved."
+    doc_db.save_context_document(document_text.strip())
+    return "Context document saved."
+
+@tool
+def read_context_doc_tool() -> str:
+    """
+    Retorna o documento de contexto com o cenário atual da empresa, equipe e tarefas
+    """
+    content = doc_db.get_context_document()
+    return content or "No context document is available."
+
 settings = Settings()
 
 # Database Configuration
@@ -149,8 +170,14 @@ chat_db = ChatDatabase(firestore_client)
 
 # Agent Configuration
 MODEL = Agent.models.GROQ
-researcher_agent = AgentAcessPoint("researcher", Agent(MODEL, settings.groq_key))
-manager_agent = AgentAcessPoint("manager", Agent(MODEL, settings.groq_key))
+RESEARCHER_PROMPT = ""
+MANAGER_PROMPT = ""
+with open("chat_agent/prompts/maestroresearcher.md", encoding="utf-8") as file:
+    RESEARCHER_PROMPT = file.read()
+with open("chat_agent/prompts/maestromanager.md", encoding="utf-8") as file:
+    MANAGER_PROMPT = file.read()
+researcher_agent = AgentAcessPoint("researcher", Agent(MODEL, settings.groq_key, RESEARCHER_PROMPT, [save_context_doc_tool]))
+manager_agent = AgentAcessPoint("manager", Agent(MODEL, settings.groq_key, MANAGER_PROMPT, [read_context_doc_tool]))
 registered_agent_acess_points = [researcher_agent, manager_agent]
 
 # Access Configuration
@@ -249,9 +276,10 @@ async def contextdoc():
 
 @app.post("/api/contextdoc/save")
 async def contextdoc_save(payload: ContextDocPayload):
-    # TODO: Turn this into a tool for the researcher model to use
     if not payload.content or not payload.content.strip():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Context content is required")
+    doc_db.save_context_document(payload.content.strip())
+    return {"status": "ok", "message": "Context document saved"}
 
 @app.post("/api/contextdoc/delete")
 async def contextdoc_delete():
@@ -290,12 +318,16 @@ async def send_agent_message(agent_name: str, chat_id: str, payload: dict, userd
     formated_message = f"USUARIO: {username} MENSAGEM: { payload['message'] }"
     try:
         response = agent.send_message(formated_message, chat_history)
+    except RateLimitError as exc:
+        return JSONResponse(
+            status_code=200,
+            content={"response": str(exc), "detail": "Rate limit exceeded"}
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500, 
             detail=e
         )
-        return JSONResponse(status_code=500, content={"detail":"An error occurred while talking to the agent"})
     
     chat_history.append({"role": "user", "content" : payload['message']})
     chat_history.append({"role": "assistant", "content" : response})

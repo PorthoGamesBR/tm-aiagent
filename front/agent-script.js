@@ -4,10 +4,6 @@ if (!token) {
 }
 loginUser();
 
-// TODO: Change this dependencies to the backend
-const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-const GROQ_MODEL = "llama-3.3-70b-versatile"
-
 // ═══════════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════════
@@ -31,6 +27,11 @@ async function get_endpoint(endpoint_url){
   headers: {
     'Authorization': `Bearer ${token}`
   }}); // Relative path automatically points to the same server
+
+    if(!response.ok) {
+      throw new Error(`Response Status: ${response.status}`)
+    }
+
     const data = await response.json();
     return data;
   } catch (error) {
@@ -161,6 +162,7 @@ async function updateAgentStatus() {
 // ═══════════════════════════════════════════════
 
 function renderChatList() {
+  loadChats();
   const list  = document.getElementById("chat-list");
   const ids   = chatIds.sort();
   const hasCtx = isContextDocAvailable();
@@ -486,7 +488,13 @@ function closeCtxViewer() {
 // ═══════════════════════════════════════════════
 
 async function loginUser() {
-  currentUser = (await get_endpoint("/api/user"))["user"]
+  try {
+    currentUser = (await get_endpoint("/api/user"))["user"]
+  } catch (e) {
+    console.log(e)
+    window.location.href = '/';
+  }
+
   localStorage.setItem("ops_agent_current_user", currentUser);
 
   document.getElementById("gate").style.display = "none";
