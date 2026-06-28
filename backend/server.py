@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import BaseModel
 
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -130,7 +131,10 @@ class ChatDatabase:
     def get_chat_id_by_user(self, username: str) -> list:
         docs = self.collection.where("username", "==", username).stream()
         return [doc.id for doc in docs]
-
+    
+class ContextDocPayload(BaseModel):
+    content: str
+    
 settings = Settings()
 
 # Database Configuration
@@ -240,15 +244,19 @@ async def agents():
     
 @app.get("/api/contextdoc")
 async def contextdoc():
+    # TODO: Turn this into a tool for the manager model to use
     return {"content": doc_db.get_context_document()}
 
 @app.post("/api/contextdoc/save")
-async def contextdoc_save():
-    pass
+async def contextdoc_save(payload: ContextDocPayload):
+    # TODO: Turn this into a tool for the researcher model to use
+    if not payload.content or not payload.content.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Context content is required")
 
 @app.post("/api/contextdoc/delete")
 async def contextdoc_delete():
-    pass
+    doc_db.delete_context_document()
+    return {"status": "ok", "message": "Context document deleted"}
 
 @app.get("/api/chats")
 async def get_chat_id_from_user(userdata: dict = Depends(get_current_user)):
@@ -267,24 +275,27 @@ async def create_new_chat(userdata: dict = Depends(get_current_user)):
 
 @app.post("/api/chat/{agent_name}/message/{chat_id}")
 async def send_agent_message(agent_name: str, chat_id: str, payload: dict, userdata: dict = Depends(get_current_user)):
-    # TODO: i want this function to get the username from the actual login, not the request, so i can guarantee is the user itself that is sending the message
     username = userdata["user"]
     agent = None
     for agent_acesspoint in registered_agent_acess_points:
         if agent_acesspoint.name == agent_name:
             if agent_acesspoint.status != AgentAcessPoint.AgentStatus.AVAILABLE:
-                return JSONResponse(status_code=401, content={"detail":f"agent {agent_name} not available"})
+                return JSONResponse(status_code=404, content={"detail":f"agent {agent_name} not available"})
             agent = agent_acesspoint.agent
             
     if agent == None:
-        return JSONResponse(status_code=401, content={"detail":f"Unknow agent {agent_name}"})
+        return JSONResponse(status_code=500, content={"detail":f"Unknow agent {agent_name}"})
         
     chat_history = chat_db.get_chat_history(chat_id)
     formated_message = f"USUARIO: {username} MENSAGEM: { payload['message'] }"
     try:
         response = agent.send_message(formated_message, chat_history)
-    except:
-        return JSONResponse(status_code=401, content={"detail":"An error occurred while talking to the agent"})
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=e
+        )
+        return JSONResponse(status_code=500, content={"detail":"An error occurred while talking to the agent"})
     
     chat_history.append({"role": "user", "content" : payload['message']})
     chat_history.append({"role": "assistant", "content" : response})
