@@ -23,14 +23,11 @@ from groq import RateLimitError
 class Settings(BaseSettings):
     groq_key: str
     jwt_secret: str
-    encrypt_algorithm: str = "HS256"
-    token_expire_minutes: int = 30
-    
-    database_provider: str = "firebase"
-    
     firebase_service_account_json: str
     firebase_project_id: str = None
-
+    encrypt_algorithm: str = "HS256"
+    token_expire_minutes: int = 30
+    database_provider: str = "firebase"
     model_config = SettingsConfigDict(
         env_file=".env"
     )
