@@ -1,70 +1,111 @@
-// ═══════════════════════════════════════════════
-//  CONFIG — paste your Groq API key here
-// ═══════════════════════════════════════════════
-const GROQ_API_KEY = "<<<api-key>>>"; // need to import the key from .env
-const GROQ_MODEL   = "llama-3.3-70b-versatile";
-const GROQ_URL     = "https://api.groq.com/openai/v1/chat/completions";
-
-// ═══════════════════════════════════════════════
-//  AGENT SYSTEM PROMPTS
-// ═══════════════════════════════════════════════
-
-function getAgent1SystemPrompt() {
-  return `<<<researcher-prompt>>>`;
+const token = localStorage.getItem('token');
+if (!token) {
+  window.location.href = '/';
 }
-
-function getAgent2SystemPrompt(userName, contextDoc) {
-  return `<<<manager-prompt>>>`;
-}
+loginUser();
 
 // ═══════════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════════
 
 let currentUser = null;
+// TODO: Should save this chat things in the browser localStorage to not use too much of firestore
+let chatIds     = [];
 let chats       = {};     // { id: { id, title, type, messages: [] } }
 let activeChatId = null;
 let isStreaming   = false;
+let contextDoc = null;
+let selectedAgentName = null;
 
 // ═══════════════════════════════════════════════
 //  HELPERS
 // ═══════════════════════════════════════════════
 
-function storageKey(suffix) { return `ops_agent_${currentUser}_${suffix}`; }
-function ctxKey()           { return `ops_ctx`; }
+async function get_endpoint(endpoint_url){
+  try {
+    const response = await fetch(endpoint_url, {
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }}); // Relative path automatically points to the same server
 
-function getContextDoc() {
-  return localStorage.getItem(ctxKey()) || null;
+    if(!response.ok) {
+      throw new Error(`Response Status: ${response.status}`)
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching local data:', error);
+    return null;
+  }
 }
 
-function saveContextDoc(doc) {
-  localStorage.setItem(ctxKey(), doc);
+async function post_endpoint(endpoint_url, request){
+  try {
+    const response = await fetch(endpoint_url, {
+    method: "POST",
+    headers: {
+    "Authorization": `Bearer ${token}`,
+    "Content-Type": "application/json"},
+    body: JSON.stringify(request)});
+     
+    if(!response.ok) {
+      throw new Error(`Response Status: ${response.status}`)
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching local data:', error);
+    return null;
+  }
 }
 
-function deleteContextDoc() {
-  localStorage.removeItem(ctxKey());
+async function getContextDoc() {
+  try {
+    const response = await get_endpoint("/api/contextdoc");
+    // Safely pull the content, or set to null if it doesn't exist
+    contextDoc = response ? response["content"] : null;
+  } catch (error) {
+    console.error("Failed to fetch context document:", error);
+    contextDoc = null; 
+  }
 }
 
-function loadChats() {
-  const raw = localStorage.getItem(storageKey("chats"));
-  chats = raw ? JSON.parse(raw) : {};
+function isContextDocAvailable() {
+  if (contextDoc !== null) {
+    return true;
+  }
+  return false;
 }
 
-function saveChats() {
-  localStorage.setItem(storageKey("chats"), JSON.stringify(chats));
+async function deleteContextDoc() {
+  await post_endpoint("/api/contextdoc/delete")
 }
 
-function initials(name) {
-  return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
+async function loadChat(id) {
+  if (!chats[id]) {
+    let chat_json =  (await get_endpoint("/api/history/" + id))
+    if (chat_json["messages"])
+      if (chat_json["messages"].length > 0)
+        chats[id] = { id: id, title: chat_json["messages"][0]["content"], messages: chat_json["messages"] }
+      else
+        chats[id] = { id: id, title: "New Chat", messages: chat_json["messages"] }
+  }
 }
 
-function generateId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+async function loadChats() {
+  chatIds = (await get_endpoint("/api/chats"))["id_list"]
+  chatIds.forEach(id => {
+    loadChat(id)
+  })
 }
 
-function updateAgentStatus() {
-  const hasCtx = !!getContextDoc();
 
+async function updateAgentStatus() {
+  // NOTE: Right now we dont have the logic to actually select what agent we should use, so for the business rule not be hardcoded here, we will use the first available agent
+  const agentStatus = (await get_endpoint("/api/agents"));
+  
   const a1dot   = document.getElementById("agent1-dot");
   const a1name  = document.getElementById("agent1-name");
   const a1badge = document.getElementById("agent1-badge");
@@ -77,24 +118,11 @@ function updateAgentStatus() {
 
   const ctxLabel = document.getElementById("view-ctx-label");
 
-  if (hasCtx) {
-    // Agent 1 — locked
-    a1dot.className   = "agent-dot dot-locked";
-    a1name.className  = "agent-name dimmed";
-    a1badge.className = "agent-badge badge-locked";
-    a1badge.textContent = "concluído";
-    a1item.classList.remove("active-agent");
-
-    // Agent 2 — active
-    a2dot.className   = "agent-dot dot-active";
-    a2name.className  = "agent-name";
-    a2badge.className = "agent-badge badge-active";
-    a2badge.textContent = "ativo";
-    a2item.classList.add("active-agent");
-
-    ctxLabel.textContent = "Ver documento de contexto";
-  } else {
-    // Agent 1 — active/pending
+  console.log(agentStatus)
+  if (agentStatus['researcher'] == 'available') {
+     selectedAgentName = 'researcher'
+     console.log("AGENTNAME " + selectedAgentName)
+     // Agent 1 — active/pending
     a1dot.className   = "agent-dot dot-pending";
     a1name.className  = "agent-name";
     a1badge.className = "agent-badge badge-pending";
@@ -109,6 +137,23 @@ function updateAgentStatus() {
     a2item.classList.remove("active-agent");
 
     ctxLabel.textContent = "Documento de contexto";
+  }else if (agentStatus['manager'] == 'available'){
+    // Agent 1 — locked
+    selectedAgentName = 'manager'
+    a1dot.className   = "agent-dot dot-locked";
+    a1name.className  = "agent-name dimmed";
+    a1badge.className = "agent-badge badge-locked";
+    a1badge.textContent = "concluído";
+    a1item.classList.remove("active-agent");
+
+    // Agent 2 — active
+    a2dot.className   = "agent-dot dot-active";
+    a2name.className  = "agent-name";
+    a2badge.className = "agent-badge badge-active";
+    a2badge.textContent = "ativo";
+    a2item.classList.add("active-agent");
+
+    ctxLabel.textContent = "Ver documento de contexto";
   }
 }
 
@@ -117,9 +162,10 @@ function updateAgentStatus() {
 // ═══════════════════════════════════════════════
 
 function renderChatList() {
+  loadChats();
   const list  = document.getElementById("chat-list");
-  const ids   = Object.keys(chats).sort((a,b) => b - a);
-  const hasCtx = !!getContextDoc();
+  const ids   = chatIds.sort();
+  const hasCtx = isContextDocAvailable();
 
   list.innerHTML = "";
 
@@ -133,7 +179,6 @@ function renderChatList() {
   ids.forEach(id => {
     const chat = chats[id];
     const isSelected = id === activeChatId;
-    const typeLabel = chat.type === "onboarding" ? "Onboarding" : "Ops";
 
     const item = document.createElement("div");
     item.className = `chat-item${isSelected ? " selected" : ""}`;
@@ -145,10 +190,9 @@ function renderChatList() {
 
     item.innerHTML = `
       <div class="chat-item-icon">
-        <svg width="14" height="14" fill="none" stroke="${chat.type === 'onboarding' ? '#FCD34D' : '#60A5FA'}" stroke-width="1.8" viewBox="0 0 24 24">${iconPath}</svg>
+        <svg width="14" height="14" fill="none" stroke="#60A5FA" stroke-width="1.8" viewBox="0 0 24 24">${iconPath}</svg>
       </div>
       <span class="chat-item-title">${escapeHtml(chat.title)}</span>
-      <span class="chat-item-type">${typeLabel}</span>
       <button class="chat-delete-btn" data-del="${id}" title="Excluir chat" aria-label="Excluir chat">
         <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>`;
@@ -180,29 +224,25 @@ function openChat(id) {
   enableInput();
 }
 
-function createNewChat() {
-  const hasCtx = !!getContextDoc();
-  const type   = hasCtx ? "ops" : "onboarding";
+async function createNewChat() {
+  const hasCtx = isContextDocAvailable();
+  // const type   = hasCtx ? "ops" : "onboarding";
 
-  const id = generateId();
-  const title = type === "onboarding"
-    ? `Onboarding — ${new Date().toLocaleDateString("pt-BR")}`
-    : `Chat Ops — ${new Date().toLocaleDateString("pt-BR")} ${new Date().toLocaleTimeString("pt-BR", {hour:"2-digit",minute:"2-digit"})}`;
+  // const id = generateId();
+  // const title = type === "onboarding"
+  //  ? `Onboarding — ${new Date().toLocaleDateString("pt-BR")}`
+  //  : `Chat Ops — ${new Date().toLocaleDateString("pt-BR")} ${new Date().toLocaleTimeString("pt-BR", {hour:"2-digit",minute:"2-digit"})}`;
 
-  chats[id] = { id, title, type, messages: [] };
-  saveChats();
+  const id = (await post_endpoint("/api/chat/newchat"))["chat_id"]
+  await loadChat(id);
   openChat(id);
-
-  if (type === "onboarding") {
-    sendAgentGreeting(id);
-  } else {
-    sendOpsGreeting(id);
-  }
 }
 
-function deleteChat(id) {
+async function deleteChat(id) {
+  // TODO: Create endpoint to delete chats
+  print("Chat deletion endpoint not implemented yet")
+  return null
   delete chats[id];
-  saveChats();
   if (activeChatId === id) {
     activeChatId = null;
     clearMain();
@@ -215,7 +255,7 @@ function deleteChat(id) {
 // ═══════════════════════════════════════════════
 
 function updateTopbar(chat) {
-  const hasCtx = !!getContextDoc();
+  const hasCtx = isContextDocAvailable();
   const titleEl  = document.getElementById("chat-title");
   const tagEl    = document.getElementById("chat-tag");
   const ctxEl    = document.getElementById("context-status");
@@ -223,13 +263,8 @@ function updateTopbar(chat) {
   titleEl.textContent = chat.title;
 
   tagEl.style.display = "inline-flex";
-  if (chat.type === "onboarding") {
-    tagEl.className = "topbar-tag tag-onboarding";
-    tagEl.textContent = "Onboarding";
-  } else {
-    tagEl.className = "topbar-tag tag-ops";
-    tagEl.textContent = "Gerente Operacional";
-  }
+  tagEl.className = "topbar-tag tag-ops";
+  tagEl.textContent = "Gerente Operacional";
 
   ctxEl.style.display = "inline-flex";
   if (hasCtx) {
@@ -263,6 +298,10 @@ function clearMain() {
 
 function escapeHtml(str) {
   return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function initials(name) {
+  return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
 }
 
 function formatMarkdown(text) {
@@ -306,7 +345,7 @@ function appendMessage(msg, scroll=true) {
 
   const avatarLabel = isUser ? userInitials : "AG";
   const avatarClass = isUser ? "user-av" : "agent-av";
-  const senderName  = isUser ? "" : (activeChatId && chats[activeChatId]?.type === "onboarding" ? "Agente Onboarding" : "Gerente Operacional");
+  const senderName  = isUser ? "" : "Gerente Operacional";
 
   const content = isUser
     ? `<div class="msg-bubble user">${escapeHtml(msg.content)}</div>`
@@ -334,7 +373,6 @@ function showTyping() {
   row.className = "msg-row agent";
   row.id = "typing-row";
   const chat = chats[activeChatId];
-  const name = chat?.type === "onboarding" ? "Agente Onboarding" : "Gerente Operacional";
   row.innerHTML = `
     <div class="msg-avatar agent-av">AG</div>
     <div class="msg-bubble agent">
@@ -367,96 +405,6 @@ function disableInput() {
 }
 
 // ═══════════════════════════════════════════════
-//  API CALL
-// ═══════════════════════════════════════════════
-
-async function callGroq(messages) {
-  if (!GROQ_API_KEY) {
-    return "[Erro: GROQ_API_KEY não configurada. Abra o arquivo HTML e cole sua chave no topo do script.]";
-  }
-
-  try {
-    const res = await fetch(GROQ_URL, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${GROQ_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        messages,
-        temperature: 0.7,
-        max_tokens: 1500,
-        stream: false
-      })
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      return `[Erro da API: ${res.status} — ${err.error?.message || "Erro desconhecido"}]`;
-    }
-
-    const data = await res.json();
-    return data.choices?.[0]?.message?.content || "[Resposta vazia do modelo]";
-  } catch (e) {
-    return `[Erro de rede: ${e.message}]`;
-  }
-}
-
-// ═══════════════════════════════════════════════
-//  AGENT GREETINGS
-// ═══════════════════════════════════════════════
-
-async function sendAgentGreeting(chatId) {
-  disableInput();
-  const typingRow = showTyping();
-
-  const systemPrompt = getAgent1SystemPrompt();
-  const intro = [
-    { role: "system", content: systemPrompt },
-    { role: "user", content: `Olá, meu nome é ${currentUser}.` }
-  ];
-
-  const reply = await callGroq(intro);
-  removeTyping();
-
-  if (!chats[chatId]) return;
-
-  chats[chatId].messages.push({ role: "user",      content: `Olá, meu nome é ${currentUser}.` });
-  chats[chatId].messages.push({ role: "assistant", content: reply });
-  saveChats();
-
-  appendMessage({ role: "assistant", content: reply });
-  enableInput();
-
-  checkForContextDoc(chatId, reply);
-}
-
-async function sendOpsGreeting(chatId) {
-  disableInput();
-  const typingRow = showTyping();
-
-  const ctx = getContextDoc();
-  const systemPrompt = getAgent2SystemPrompt(currentUser, ctx);
-  const intro = [
-    { role: "system", content: systemPrompt },
-    { role: "user",   content: `[QUEM ESTÁ FALANDO]: ` + currentUser + ` [DOCUMENTO_DE_CONTEXTO]: ` + ctx + ` [MESSAGE]: Olá.` }
-  ];
-
-  const reply = await callGroq(intro);
-  removeTyping();
-
-  if (!chats[chatId]) return;
-
-  chats[chatId].messages.push({ role: "user",   content: `[QUEM ESTÁ FALANDO]: ` + currentUser + ` [DOCUMENTO_DE_CONTEXTO]: ` + ctx + ` [MESSAGE]: Olá.` });
-  chats[chatId].messages.push({ role: "assistant", content: reply });
-  saveChats();
-
-  appendMessage({ role: "assistant", content: reply });
-  enableInput();
-}
-
-// ═══════════════════════════════════════════════
 //  SEND MESSAGE
 // ═══════════════════════════════════════════════
 
@@ -471,7 +419,6 @@ async function sendMessage() {
 
   const chat = chats[activeChatId];
   chat.messages.push({ role: "user", content });
-  saveChats();
   appendMessage({ role: "user", content });
 
   isStreaming = true;
@@ -480,65 +427,45 @@ async function sendMessage() {
 
   let apiMessages;
 
-  if (chat.type === "onboarding") {
-    apiMessages = [
-      { role: "system", content: getAgent1SystemPrompt() },
-      ...chat.messages.map(m => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }))
-    ];
-  } else {
-    const ctx = getContextDoc();
-    apiMessages = [
-      { role: "system", content: getAgent2SystemPrompt(currentUser, ctx) },
-      ...chat.messages.map(m => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }))
-    ];
-  }
-
-  const reply = await callGroq(apiMessages);
+  const reply = (await post_endpoint("/api/chat/" + selectedAgentName + "/message/" + activeChatId, 
+     {message: content}))["response"]
   removeTyping();
+
+  console.log(reply)
 
   if (!chats[activeChatId]) { isStreaming = false; return; }
 
   chats[activeChatId].messages.push({ role: "assistant", content: reply });
-  saveChats();
   appendMessage({ role: "assistant", content: reply });
 
   isStreaming = false;
   enableInput();
 
-  if (chat.type === "onboarding") {
-    checkForContextDoc(activeChatId, reply);
-  }
+  checkForContextDoc();
 }
 
 // ═══════════════════════════════════════════════
 //  CONTEXT DOC DETECTION
 // ═══════════════════════════════════════════════
 
-function checkForContextDoc(chatId, text) {
-  const startMarker = "===DOCUMENTO_DE_CONTEXTO_INICIO===";
-  const endMarker   = "===DOCUMENTO_DE_CONTEXTO_FIM===";
- 
-  const startIdx = text.indexOf(startMarker);
-  const endIdx   = text.indexOf(endMarker);
- 
-  if (startIdx === -1 || endIdx === -1) return;
- 
-  const doc = text.slice(startIdx + startMarker.length, endIdx).trim();
-  saveContextDoc(doc);
+function checkForContextDoc() {
+  getContextDoc();
 
   updateAgentStatus();
-  updateTopbar(chats[chatId]);
+  updateTopbar(chats[activeChatId]);
   renderChatList();
 
   // show confirmation in chat
-  setTimeout(() => {
-    const notif = document.createElement("div");
-    notif.style.cssText = "display:flex;align-items:center;gap:10px;background:#ECFDF5;border:1px solid #A7F3D0;border-radius:8px;padding:10px 14px;font-size:13px;color:#065F46;margin:4px 0;";
-    notif.innerHTML = `<svg width="16" height="16" fill="none" stroke="#059669" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-      <span><strong>Documento de contexto gerado.</strong> O Gerente Operacional já está disponível.</span>`;
-    document.getElementById("messages").appendChild(notif);
-    scrollToBottom();
-  }, 300);
+  if (isContextDocAvailable()) {
+    setTimeout(() => {
+      const notif = document.createElement("div");
+      notif.style.cssText = "display:flex;align-items:center;gap:10px;background:#ECFDF5;border:1px solid #A7F3D0;border-radius:8px;padding:10px 14px;font-size:13px;color:#065F46;margin:4px 0;";
+      notif.innerHTML = `<svg width="16" height="16" fill="none" stroke="#059669" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <span><strong>Documento de contexto gerado.</strong> O Gerente Operacional já está disponível.</span>`;
+      document.getElementById("messages").appendChild(notif);
+      scrollToBottom();
+    }, 300);
+  }
 }
 
 // ═══════════════════════════════════════════════
@@ -546,7 +473,7 @@ function checkForContextDoc(chatId, text) {
 // ═══════════════════════════════════════════════
 
 function openCtxViewer() {
-  const doc = getContextDoc();
+  const doc = contextDoc;
   if (!doc) return;
   document.getElementById("ctx-viewer-body").textContent = doc;
   document.getElementById("ctx-viewer").classList.remove("hidden");
@@ -560,21 +487,23 @@ function closeCtxViewer() {
 //  USER LOGIN
 // ═══════════════════════════════════════════════
 
-function loginUser(name) {
-  currentUser = name.trim();
+async function loginUser() {
+  try {
+    currentUser = (await get_endpoint("/api/user"))["user"]
+  } catch (e) {
+    console.log(e)
+    window.location.href = '/';
+  }
+
   localStorage.setItem("ops_agent_current_user", currentUser);
 
   document.getElementById("gate").style.display = "none";
   document.getElementById("user-avatar").textContent = initials(currentUser);
   document.getElementById("identity-name").textContent = currentUser;
 
-  const noKey = !GROQ_API_KEY;
-  if (noKey) {
-    document.getElementById("config-notice").classList.remove("hidden");
-  }
-
-  loadChats();
-  updateAgentStatus();
+  await getContextDoc();
+  await loadChats();
+  await updateAgentStatus();
   renderChatList();
   clearMain();
 }
@@ -582,25 +511,6 @@ function loginUser(name) {
 // ═══════════════════════════════════════════════
 //  EVENTS
 // ═══════════════════════════════════════════════
-
-// Gate
-document.getElementById("gate-submit").addEventListener("click", () => {
-  const name = document.getElementById("gate-name-input").value.trim();
-  if (!name) return;
-  loginUser(name);
-});
-
-document.getElementById("gate-name-input").addEventListener("keydown", e => {
-  if (e.key === "Enter") document.getElementById("gate-submit").click();
-});
-
-// Change user
-document.getElementById("change-user-btn").addEventListener("click", () => {
-  activeChatId = null;
-  clearMain();
-  document.getElementById("gate-name-input").value = "";
-  document.getElementById("gate").style.display = "flex";
-});
 
 // New chat
 document.getElementById("new-chat-btn").addEventListener("click", () => {
@@ -626,8 +536,7 @@ document.getElementById("msg-input").addEventListener("input", function() {
 
 // Context doc viewer
 document.getElementById("view-ctx-btn").addEventListener("click", () => {
-  const doc = getContextDoc();
-  if (doc) {
+  if (isContextDocAvailable()) {
     openCtxViewer();
   }
 });
@@ -645,10 +554,4 @@ document.getElementById("ctx-delete-btn").addEventListener("click", () => {
   updateAgentStatus();
   if (activeChatId) updateTopbar(chats[activeChatId]);
   renderChatList();
-});
-
-// Auto-login if returning user
-window.addEventListener("load", () => {
-  const saved = localStorage.getItem("ops_agent_current_user");
-  if (saved) loginUser(saved);
 });
