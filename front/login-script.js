@@ -29,7 +29,7 @@ async function loginUser(urlEncodedData) {
         // 3. Save the token that FastAPI sent back
         localStorage.setItem('token', data.access_token);
         console.log("Logged in successfully!");
-        window.location.href = '/agent-showcase-base.html';
+        window.location.href = '/agent.html';
     } else {
         const errorData = await response.json();
         alert(`Login failed: ${errorData.detail || 'Invalid credentials'}`);
