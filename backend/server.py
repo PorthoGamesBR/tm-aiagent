@@ -166,15 +166,16 @@ user_db = UserDatabase(firestore_client)
 chat_db = ChatDatabase(firestore_client)
 
 # Agent Configuration
-MODEL = Agent.models.GROQ
+SOURCE = Agent.Sources.GROQ
+MODEL = Agent.Models.LLAMA
 RESEARCHER_PROMPT = ""
 MANAGER_PROMPT = ""
 with open("chat_agent/prompts/maestroresearcher.md", encoding="utf-8") as file:
     RESEARCHER_PROMPT = file.read()
 with open("chat_agent/prompts/maestromanager.md", encoding="utf-8") as file:
     MANAGER_PROMPT = file.read()
-researcher_agent = AgentAcessPoint("researcher", Agent(MODEL, settings.groq_key, RESEARCHER_PROMPT, [save_context_doc_tool]))
-manager_agent = AgentAcessPoint("manager", Agent(MODEL, settings.groq_key, MANAGER_PROMPT, [read_context_doc_tool]))
+researcher_agent = AgentAcessPoint("researcher", Agent(SOURCE, settings.groq_key, RESEARCHER_PROMPT, [save_context_doc_tool], MODEL))
+manager_agent = AgentAcessPoint("manager", Agent(SOURCE, settings.groq_key, MANAGER_PROMPT, [read_context_doc_tool], MODEL))
 registered_agent_acess_points = [researcher_agent, manager_agent]
 
 # Access Configuration
