@@ -10,7 +10,7 @@ from langgraph.graph import (
 )
 from pydantic import BaseModel
 
-class ResarcherAgent:
+class ResearcherAgent:
     class ResearchState(TypedDict):
         context_document: str
         investigation_coverage: dict[str, bool]
@@ -49,8 +49,8 @@ class ResarcherAgent:
 
     def __init__(self, key:str, source: Agent.Sources, model: Agent.Models):
         self.llm = Agent.llm_source(source)(key, model)
-        self.structured_llm = (self.llm.with_structured_output(ResarcherAgent.Coverage))
-        graph = StateGraph(ResarcherAgent.ResearchState)
+        self.structured_llm = (self.llm.with_structured_output(ResearcherAgent.Coverage))
+        graph = StateGraph(ResearcherAgent.ResearchState)
         graph.add_node(
             "generate_question",
             self.generate_question
