@@ -20,6 +20,9 @@ class ResearcherAgent:
         last_question: str | None
         last_answer: str | None
         valid_answer: bool
+        context_document: str | None
+        evaluation_reason : str | None
+        answered_questions: list
 
     class AnswerEvaluation(BaseModel):
         valid: bool
@@ -40,16 +43,19 @@ class ResearcherAgent:
         graph = StateGraph(ResearcherAgent.ResearchState)
 
         # Nodes
-        graph.add_node("introduction", self.introduction)
-        graph.add_node("wait_initial_description", self.wait_initial_description)
-        graph.add_node("validate_answer", self.validate_answer)
+        graph.add_node("introduction", self._introduction)
+        graph.add_node("wait_initial_description", self._wait_initial_description)
+        graph.add_node("validate_answer", self._validate_answer)
+        graph.add_node("update_context", self._update_context)
+        graph.add_node("generate_question", self._generate_question)
 
         # Fluxo inicial: introdução -> descrição inicial -> primeiro documento -> critica -> cobertura
         graph.add_edge(START, "introduction")
         graph.add_edge("introduction", "wait_initial_description")
         graph.add_edge("wait_initial_description", "validate_answer")
-
-        graph.add_edge("validate_answer", END)
+        graph.add_conditional_edges("validate_answer", self._should_retry)
+        graph.add_edge("update_context", "generate_question")
+        graph.add_edge("generate_question", END)
 
         self.research_graph = graph.compile(checkpointer=self.checkpointer)
 
@@ -72,7 +78,7 @@ class ResearcherAgent:
             return None
     
 # ---------------- Introducao ----------------
-    def introduction(self, state: ResearchState):
+    def _introduction(self, state: ResearchState):
         question = "O que vocês estão tentando construir?"
         message = f"""Olá! Sou o Maestro.\n\nVou ajudar a entender o projeto, a equipe e o contexto atual antes de começarmos a organizar o trabalho.\nPara começar, me conte: {question}"""
         return {
@@ -80,7 +86,7 @@ class ResearcherAgent:
             "last_question": question
         }
 
-    def wait_initial_description(self, state: ResearchState):
+    def _wait_initial_description(self, state: ResearchState):
         answer = interrupt(
             {
                 "type": "initial_description",
@@ -93,41 +99,59 @@ class ResearcherAgent:
         }
 
 # ---------------- Loop de perguntas ----------------
-    def generate_question(self, state: ResearchState):
-        prompt = f"""
-        Você é um investigador de projetos.
+    def _generate_question(self, state: ResearchState):
+        if state.get("valid_answer"):
+            prompt = f"""
+            Você é um investigador de projetos.
 
-        Documento:
+            Documento:
 
-        {state['context_document']}
+            {state['context_document']}
 
-        Cobertura atual:
+            Perguntas já respondidas:
 
-        {state['investigation_coverage']}
+            {state['answered_questions']}
 
-        Notas do critico sobre lacunas:
+            Sua tarefa:
 
-        {state.get('critic_notes', '')}
+            1. Descubra o assunto mais importante que ainda não foi investigado.
+            2. Faça apenas UMA pergunta.
+            3. Não gere plano.
+            4. Não faça várias perguntas.
 
-        Perguntas já respondidas:
+            Retorne somente a pergunta.
+            """
+        else: 
+            prompt = f"""
+            Você é um investigador de projetos no meio de uma entrevista e acabou de receber uma resposta que foi avaliada da seguinte forma.
 
-        {state['answered_questions']}
+            {state ['evaluation_reason']}
 
-        Sua tarefa:
+            Ultima pergunta:
+            
+            {state['last_question']}
 
-        1. Descubra o assunto mais importante que ainda não foi investigado.
-        2. Faça apenas UMA pergunta.
-        3. Não gere plano.
-        4. Não faça várias perguntas.
+            Ultima resposta:
+            
+            {state['last_answer']}
 
-        Retorne somente a pergunta.
-        """
+            Sua tarefa:
+
+            1. Crie uma pergunta para enviar ao entrevistado explicando o motivo da sua ultima resposta ter sido reprovada.
+            2. Faça apenas UMA pergunta.
+            3. Não gere plano.
+            4. Não faça várias perguntas.
+            5. O objetivo ainda é responder a pergunta original. Não faça uma pergunta que não leve a resposta da pergunta original.
+
+            Retorne somente a pergunta.
+            """
 
         response = self.llm.invoke([HumanMessage(content=prompt)])
+        
+        print(f"DEBUG: Question: \n{response.content}")
 
         return {
-            "open_questions": state["open_questions"] + [response.content],
-            "phase": "DISCOVERY",
+            "last_question": response.content
         }
 
     def ask_user(self, state: ResearchState):
@@ -142,7 +166,7 @@ class ResearcherAgent:
         }
 
 # ---------------- Validação da resposta ----------------
-    def validate_answer(self, state: ResearchState):
+    def _validate_answer(self, state: ResearchState):
         question = state["last_question"]
         answer = state["last_answer"]
 
@@ -157,7 +181,7 @@ class ResearcherAgent:
 
         Avalie se a resposta realmente responde à pergunta (mesmo que de forma
         breve ou incompleta, mas coerente). Caso o usuário não saiba responder, ou não possa responder, é uma resposta valida. 
-        Considere inválida **apenas** se for vazia, sem relação com a pergunta, ou claramente evasiva.
+        Considere inválida **apenas** se for vazia, se for outra pergunta, sem relação com a pergunta, ou claramente evasiva.  
 
         Se inválida, explique o motivo.
         """
@@ -165,37 +189,47 @@ class ResearcherAgent:
         evaluation = self.answer_llm.invoke(prompt)
 
         if evaluation.valid:
-            return {"valid_answer": True}
+            return {"valid_answer": True, "answered_questions": state.get('answered_questions', []) + [question]}
 
         # resposta invalida
         print(f"DEBUG: Resposta não válida. Motivo: {evaluation.reason}")
         return {
-            "answer_valid": False
+            "valid_answer": False,
+            "evaluation_reason" : evaluation.reason
         }
 
-    def should_retry(self, state: ResearchState):
-        if state.get("answer_valid", True):
+    def _should_retry(self, state: ResearchState):
+        if state.get("valid_answer", True):
+            print("DEBUG: Going to update context")
             return "update_context"
-        return "ask_user"
+        print("DEBUG: Not updating context, time to ask a new question")
+        return "generate_question"
 
     # ---------------- Atualização de contexto ----------------
-    def update_context(self, state: ResearchState):
-        answer = state["answered_questions"][-1]
+    def _update_context(self, state: ResearchState):
+        last_question = state["last_question"]
+        last_answer = state["last_answer"]
 
         prompt = f"""
-Documento atual:
+            Você está produzindo um documento que vai ser usado por um gerente de equipe para seu processo decisório diário.
+            Ele está sendo produzido durante uma entrevista com a equipe que esse gerente vai assumir.
+            O documento deve ser como um manual, não deve referenciar a forma que foi feito.
+            Atualize o documento em Markdown.
+            Documento atual:
 
-{state['context_document']}
+            {state.get('context_document', '')}
+            
+            Pergunta feita a equipe:
+            
+            {last_question}
 
-Nova informação:
+            Resposta da equipe:
 
-{answer}
-
-Atualize o documento
-em Markdown.
-"""
+            {last_answer}
+            """
 
         response = self.llm.invoke([HumanMessage(content=prompt)])
+        print(f"DEBUG: Novo documento: \n{response.content}")
 
         return {
             "context_document": response.content
