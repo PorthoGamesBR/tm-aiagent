@@ -23,6 +23,7 @@ class ResearcherAgent:
         context_document: str | None
         evaluation_reason : str | None
         answered_questions: list
+        retry_question: int
 
     class AnswerEvaluation(BaseModel):
         valid: bool
@@ -48,14 +49,16 @@ class ResearcherAgent:
         graph.add_node("validate_answer", self._validate_answer)
         graph.add_node("update_context", self._update_context)
         graph.add_node("generate_question", self._generate_question)
+        graph.add_node("ask_user", self._ask_user)
 
         # Fluxo inicial: introdução -> descrição inicial -> primeiro documento -> critica -> cobertura
         graph.add_edge(START, "introduction")
         graph.add_edge("introduction", "wait_initial_description")
         graph.add_edge("wait_initial_description", "validate_answer")
         graph.add_conditional_edges("validate_answer", self._should_retry)
-        graph.add_edge("update_context", "generate_question")
-        graph.add_edge("generate_question", END)
+        graph.add_conditional_edges("update_context", self._should_ask_more)
+        graph.add_edge("generate_question", "ask_user")
+        graph.add_edge("ask_user", "validate_answer")
 
         self.research_graph = graph.compile(checkpointer=self.checkpointer)
 
@@ -154,15 +157,15 @@ class ResearcherAgent:
             "last_question": response.content
         }
 
-    def ask_user(self, state: ResearchState):
+    def _ask_user(self, state: ResearchState):
         answer = interrupt(
             {
-                "question": state["open_questions"][-1]
+                "question": state["last_question"]
             }
         )
 
         return {
-            "answered_questions": state["answered_questions"] + [answer]
+            "last_answer": answer
         }
 
 # ---------------- Validação da resposta ----------------
@@ -189,21 +192,28 @@ class ResearcherAgent:
         evaluation = self.answer_llm.invoke(prompt)
 
         if evaluation.valid:
-            return {"valid_answer": True, "answered_questions": state.get('answered_questions', []) + [question]}
+            return {"valid_answer": True, "answered_questions": state.get('answered_questions', []) + [question], "retry_question":0}
 
         # resposta invalida
         print(f"DEBUG: Resposta não válida. Motivo: {evaluation.reason}")
         return {
             "valid_answer": False,
-            "evaluation_reason" : evaluation.reason
+            "evaluation_reason" : evaluation.reason,
+            "retry_question": state.get("retry_question", 0) + 1
         }
 
     def _should_retry(self, state: ResearchState):
-        if state.get("valid_answer", True):
+        valid_answer = state.get("valid_answer", True)
+        retries = state.get("retry_question", 0)
+        if valid_answer:
             print("DEBUG: Going to update context")
             return "update_context"
-        print("DEBUG: Not updating context, time to ask a new question")
-        return "generate_question"
+        elif not valid_answer and retries <= 3:
+            print("DEBUG: Not updating context, time to ask a new question")
+            return "generate_question"
+        else:
+            # TODO: Change this to a node explaining the motive for the ending of the conversation
+            return END
 
     # ---------------- Atualização de contexto ----------------
     def _update_context(self, state: ResearchState):
@@ -234,6 +244,13 @@ class ResearcherAgent:
         return {
             "context_document": response.content
         }
+        
+    def _should_ask_more(self, state: ResearchState):
+        if len(state.get('answered_questions', [])) <= 3:
+            print(f"DEBUG: Generating another question. Already have {len(state.get('answered_questions', []))} answered questions")
+            return "generate_question"
+        print("DEBUG: Not generating more question, already have 3")
+        return END
 
     # ---------------- Critico ----------------
     def critic(self, state: ResearchState):
