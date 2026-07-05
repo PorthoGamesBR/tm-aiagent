@@ -25,6 +25,35 @@ A solução que quero criar deve:
 - Garantir que todos participem e contribuam para o projeto.
 - Ser adaptável e genérica o suficiente para que possa ser usada em outros contextos. O problema que trouxe é um case que esse agente deve solucionar, mas não o unico.
 
+## Os agentes
+O trabalho acabou ficando muito complexo para um agente só. Precisamos primeiro de um agente que consiga lidar com a pesquisa de elicitação de conhecimento organizacional e depois um que aja como gerente com essas informações.
+
+O problema principal é a tech stack que estamos usando para comunicação com o LLM: _LangChain_ e _LangGraph_. _LangChain_ não é otimizada para agentes muito complexos, geralmente é mais focada para agentes simples, quase determinísticos, e estava usando como tecnologia primária para desenvolver ambos os agentes.
+
+### Agente de Pesquisa
+O agente de pesquisa é construido com _LangGraph_ por conta de sua complexidade. Para alcançar o objetivo precisamos de um agente com estado, um fluxo bem definido e uma saída bem definida.
+
+Regra: Sempre que recebe uma resposta do usuário, valida se a resposta tem alguma coisa haver com a pergunta original. 
+1. Envia uma mensagem pro usuário explicando seu propósito e pedindo mais informações sobre a empresa
+2. Após receber a resposta, calcula uma unica vez quais assuntos são necessários além dos pré definidos (genéricos pra qualquer empresa).
+3. Para cada assunto gera uma pergunta, espera a resposta do usuário e adiciona a resposta ao contexto
+4. Quando não tiver mais nenhuma pergunta, gera o documento final.
+
+O desenvolvimento desse agente será feito passo a passo, testando cada nó e sua resposta individualmente baseado em roteiro de case pré definido.
+
+#### Nós
+1. Introduction
+2. Wait Initial Description (interrupt)
+3. Generate Question
+4. Ask User (interrupt)
+5. Validate Answer
+6. Update Context
+7. Critic
+8. Evaluate Coverage
+9. Finalize
+
+O unico objetivo do nó de introduction é mandar a mensagem inicial que é fixa. O teste deste é só ver se o agente compilado recebe a mensagem do usuário após isso e se classifica devidamente como tendo haver com a pergunta ou não.
+### Agente Gerente
 
 ## Front end
 
