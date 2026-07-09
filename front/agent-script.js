@@ -15,7 +15,7 @@ let chats       = {};     // { id: { id, title, type, messages: [] } }
 let activeChatId = null;
 let isStreaming   = false;
 let contextDoc = null;
-let selectedAgentName = null;
+let selectedAgentName = 'manager'; // Único agente disponível: Gerente Operacional
 
 // ═══════════════════════════════════════════════
 //  HELPERS
@@ -103,57 +103,22 @@ async function loadChats() {
 
 
 async function updateAgentStatus() {
-  // NOTE: Right now we dont have the logic to actually select what agent we should use, so for the business rule not be hardcoded here, we will use the first available agent
-  const agentStatus = (await get_endpoint("/api/agents"));
-  
-  const a1dot   = document.getElementById("agent1-dot");
-  const a1name  = document.getElementById("agent1-name");
-  const a1badge = document.getElementById("agent1-badge");
-  const a1item  = document.getElementById("agent1-item");
+  // Apenas o Gerente Operacional está disponível no sistema.
+  // A lógica do agente pesquisador foi removida — o gerente
+  // é sempre tratado como ativo.
+  selectedAgentName = 'manager';
 
   const a2dot   = document.getElementById("agent2-dot");
   const a2name  = document.getElementById("agent2-name");
   const a2badge = document.getElementById("agent2-badge");
   const a2item  = document.getElementById("agent2-item");
 
-  const ctxLabel = document.getElementById("view-ctx-label");
-
-  console.log(agentStatus)
-  if (agentStatus['researcher'] == 'available') {
-     selectedAgentName = 'researcher'
-     console.log("AGENTNAME " + selectedAgentName)
-     // Agent 1 — active/pending
-    a1dot.className   = "agent-dot dot-pending";
-    a1name.className  = "agent-name";
-    a1badge.className = "agent-badge badge-pending";
-    a1badge.textContent = "aguardando";
-    a1item.classList.add("active-agent");
-
-    // Agent 2 — locked
-    a2dot.className   = "agent-dot dot-locked";
-    a2name.className  = "agent-name dimmed";
-    a2badge.className = "agent-badge badge-locked";
-    a2badge.textContent = "bloqueado";
-    a2item.classList.remove("active-agent");
-
-    ctxLabel.textContent = "Documento de contexto";
-  }else if (agentStatus['manager'] == 'available'){
-    // Agent 1 — locked
-    selectedAgentName = 'manager'
-    a1dot.className   = "agent-dot dot-locked";
-    a1name.className  = "agent-name dimmed";
-    a1badge.className = "agent-badge badge-locked";
-    a1badge.textContent = "concluído";
-    a1item.classList.remove("active-agent");
-
-    // Agent 2 — active
+  if (a2dot) {
     a2dot.className   = "agent-dot dot-active";
     a2name.className  = "agent-name";
     a2badge.className = "agent-badge badge-active";
     a2badge.textContent = "ativo";
     a2item.classList.add("active-agent");
-
-    ctxLabel.textContent = "Ver documento de contexto";
   }
 }
 
@@ -255,7 +220,6 @@ async function deleteChat(id) {
 // ═══════════════════════════════════════════════
 
 function updateTopbar(chat) {
-  const hasCtx = isContextDocAvailable();
   const titleEl  = document.getElementById("chat-title");
   const tagEl    = document.getElementById("chat-tag");
   const ctxEl    = document.getElementById("context-status");
@@ -266,13 +230,9 @@ function updateTopbar(chat) {
   tagEl.className = "topbar-tag tag-ops";
   tagEl.textContent = "Gerente Operacional";
 
-  ctxEl.style.display = "inline-flex";
-  if (hasCtx) {
-    ctxEl.className = "context-status ctx-ready";
-    ctxEl.innerHTML = `<svg width="10" height="10" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg> Contexto ativo`;
-  } else {
-    ctxEl.className = "context-status ctx-missing";
-    ctxEl.innerHTML = `<svg width="10" height="10" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg> Sem contexto`;
+  // Opção de visualizar documento de contexto foi desativada.
+  if (ctxEl) {
+    ctxEl.style.display = "none";
   }
 }
 
@@ -372,11 +332,10 @@ function showTyping() {
   const row = document.createElement("div");
   row.className = "msg-row agent";
   row.id = "typing-row";
-  const chat = chats[activeChatId];
   row.innerHTML = `
     <div class="msg-avatar agent-av">AG</div>
     <div class="msg-bubble agent">
-      <div class="msg-sender">${name}</div>
+      <div class="msg-sender">Gerente Operacional</div>
       <div class="typing-dots"><span></span><span></span><span></span></div>
     </div>`;
   container.appendChild(row);
@@ -425,8 +384,6 @@ async function sendMessage() {
   disableInput();
   const typingRow = showTyping();
 
-  let apiMessages;
-
   const reply = (await post_endpoint("/api/chat/" + selectedAgentName + "/message/" + activeChatId, 
      {message: content}))["response"]
   removeTyping();
@@ -454,33 +411,6 @@ function checkForContextDoc() {
   updateAgentStatus();
   updateTopbar(chats[activeChatId]);
   renderChatList();
-
-  // show confirmation in chat
-  if (isContextDocAvailable()) {
-    setTimeout(() => {
-      const notif = document.createElement("div");
-      notif.style.cssText = "display:flex;align-items:center;gap:10px;background:#ECFDF5;border:1px solid #A7F3D0;border-radius:8px;padding:10px 14px;font-size:13px;color:#065F46;margin:4px 0;";
-      notif.innerHTML = `<svg width="16" height="16" fill="none" stroke="#059669" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-        <span><strong>Documento de contexto gerado.</strong> O Gerente Operacional já está disponível.</span>`;
-      document.getElementById("messages").appendChild(notif);
-      scrollToBottom();
-    }, 300);
-  }
-}
-
-// ═══════════════════════════════════════════════
-//  CONTEXT DOC VIEWER
-// ═══════════════════════════════════════════════
-
-function openCtxViewer() {
-  const doc = contextDoc;
-  if (!doc) return;
-  document.getElementById("ctx-viewer-body").textContent = doc;
-  document.getElementById("ctx-viewer").classList.remove("hidden");
-}
-
-function closeCtxViewer() {
-  document.getElementById("ctx-viewer").classList.add("hidden");
 }
 
 // ═══════════════════════════════════════════════
@@ -497,7 +427,6 @@ async function loginUser() {
 
   localStorage.setItem("ops_agent_current_user", currentUser);
 
-  document.getElementById("gate").style.display = "none";
   document.getElementById("user-avatar").textContent = initials(currentUser);
   document.getElementById("identity-name").textContent = currentUser;
 
@@ -506,6 +435,10 @@ async function loginUser() {
   await updateAgentStatus();
   renderChatList();
   clearMain();
+
+  // Esconde permanentemente o botão de visualizar documento de contexto
+  const viewCtxBtn = document.getElementById("view-ctx-btn");
+  if (viewCtxBtn) viewCtxBtn.style.display = "none";
 }
 
 // ═══════════════════════════════════════════════
@@ -534,24 +467,5 @@ document.getElementById("msg-input").addEventListener("input", function() {
   this.style.height = Math.min(this.scrollHeight, 140) + "px";
 });
 
-// Context doc viewer
-document.getElementById("view-ctx-btn").addEventListener("click", () => {
-  if (isContextDocAvailable()) {
-    openCtxViewer();
-  }
-});
-
-document.getElementById("ctx-viewer-close").addEventListener("click", closeCtxViewer);
-document.getElementById("ctx-close-btn").addEventListener("click", closeCtxViewer);
-document.getElementById("ctx-viewer").addEventListener("click", e => {
-  if (e.target === document.getElementById("ctx-viewer")) closeCtxViewer();
-});
-
-document.getElementById("ctx-delete-btn").addEventListener("click", () => {
-  if (!confirm("Excluir o documento de contexto? O Gerente Operacional ficará bloqueado até um novo onboarding.")) return;
-  deleteContextDoc();
-  closeCtxViewer();
-  updateAgentStatus();
-  if (activeChatId) updateTopbar(chats[activeChatId]);
-  renderChatList();
-});
+// A opção "ver documento de contexto" foi removida — os listeners
+// de view-ctx-btn / ctx-viewer foram desativados abaixo.

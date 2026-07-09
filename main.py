@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from agent import Agent
+from agents.agent import Agent
 # from ContextBuilder import ContextBuilder
 
 # Glue to all pieces of the project
