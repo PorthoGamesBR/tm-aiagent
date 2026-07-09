@@ -12,33 +12,6 @@
 </head>
 <body>
 
-<!-- ── GATE ── -->
-<div id="gate">
-  <div id="gate-card">
-    <div class="g-logo">Ops Agent</div>
-    <h2>Bem-vindo</h2>
-    <p>Informe seu nome para continuar. Seus chats e contexto ficam salvos localmente neste navegador.</p>
-    <label for="gate-name-input">Seu nome</label>
-    <input id="gate-name-input" type="text" placeholder="Ex: Ana, Carlos..." autocomplete="off" maxlength="40" />
-    <button id="gate-submit">Entrar</button>
-  </div>
-</div>
-
-<!-- ── CONTEXT DOC VIEWER ── -->
-<div id="ctx-viewer" class="hidden">
-  <div id="ctx-viewer-card">
-    <div id="ctx-viewer-header">
-      <h3>Documento de Contexto</h3>
-      <button id="ctx-viewer-close">×</button>
-    </div>
-    <div id="ctx-viewer-body"></div>
-    <div id="ctx-viewer-footer">
-      <button class="btn-danger" id="ctx-delete-btn">Excluir documento</button>
-      <button class="btn-ghost" id="ctx-close-btn">Fechar</button>
-    </div>
-  </div>
-</div>
-
 <!-- ── SIDEBAR ── -->
 <div id="sidebar">
   <div class="sidebar-header">
@@ -56,13 +29,7 @@
   </div>
 
   <div class="sidebar-section">
-    <div class="sidebar-section-label">Agentes</div>
-
-    <div class="agent-item" id="agent1-item">
-      <div class="agent-dot dot-pending" id="agent1-dot"></div>
-      <span class="agent-name dimmed" id="agent1-name">Agente de Onboarding</span>
-      <span class="agent-badge badge-pending" id="agent1-badge">pendente</span>
-    </div>
+    <div class="sidebar-section-label">Agente</div>
 
     <div class="agent-item" id="agent2-item">
       <div class="agent-dot dot-locked" id="agent2-dot"></div>
@@ -77,15 +44,6 @@
   </button>
 
   <div id="chat-list"></div>
-
-  <!-- context doc link -->
-  <div style="padding: 10px 16px; border-top: 1px solid var(--navy-light);">
-    <button id="view-ctx-btn" style="background:none;border:none;cursor:pointer;font-family:var(--font);font-size:11px;color:var(--text-sidebar-muted);display:flex;align-items:center;gap:6px;width:100%;padding:4px 0;transition:color 0.15s;"
-      onmouseover="this.style.color='#CBD5E1'" onmouseout="this.style.color='var(--text-sidebar-muted)'">
-      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-      <span id="view-ctx-label">Documento de contexto</span>
-    </button>
-  </div>
 </div>
 
 <!-- ── MAIN ── -->

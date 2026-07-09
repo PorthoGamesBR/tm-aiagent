@@ -1,6 +1,8 @@
 import json
 from datetime import datetime, timedelta, timezone
-from agent import Agent
+from agents.agent import Agent
+from agents.model import Model
+from agents import Providers, LLMs
 
 from fastapi import Depends, FastAPI, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
@@ -19,6 +21,9 @@ from passlib.context import CryptContext
 
 from langchain_core.tools import tool
 from groq import RateLimitError
+
+from .project_context_database import ProjectContextDatabase
+from .project_context_service import ProjectContextService
 
 class Settings(BaseSettings):
     groq_key: str
@@ -165,18 +170,24 @@ doc_db = DocumentDatabase(firestore_client)
 user_db = UserDatabase(firestore_client)
 chat_db = ChatDatabase(firestore_client)
 
+proj_ctx_db = ProjectContextDatabase(firestore_client)
+proj_ctx_srv = ProjectContextService(proj_ctx_db)
+
 # Agent Configuration
-SOURCE = Agent.Sources.GROQ
-MODEL = Agent.Models.LLAMA
+SOURCE = Providers.GROQ
+MODEL = LLMs.LLAMA
 RESEARCHER_PROMPT = ""
 MANAGER_PROMPT = ""
 with open("chat_agent/prompts/maestroresearcher.md", encoding="utf-8") as file:
     RESEARCHER_PROMPT = file.read()
 with open("chat_agent/prompts/maestromanager.md", encoding="utf-8") as file:
     MANAGER_PROMPT = file.read()
-researcher_agent = AgentAcessPoint("researcher", Agent(SOURCE, settings.groq_key, RESEARCHER_PROMPT, [save_context_doc_tool], MODEL))
-manager_agent = AgentAcessPoint("manager", Agent(SOURCE, settings.groq_key, MANAGER_PROMPT, [read_context_doc_tool], MODEL))
-registered_agent_acess_points = [researcher_agent, manager_agent]
+    
+# researcher_agent = AgentAcessPoint("researcher", Agent(SOURCE, settings.groq_key, RESEARCHER_PROMPT, [save_context_doc_tool], MODEL)
+manager_model = Model(SOURCE, MODEL, settings.groq_key)
+manager_agent = AgentAcessPoint("manager", Agent(manager_model, f"{MANAGER_PROMPT} \n # Contexto Atual: \n {proj_ctx_srv.get_project_markdown()}"))
+
+registered_agent_acess_points = [manager_agent]
 
 # Access Configuration
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -209,12 +220,22 @@ def authenticate_user(username, password) -> dict:
 def evaluate_agent_status():
     # If the context document exists, then only the manager should be available. If it doesn't, only the researcher should be available
     context_doc = doc_db.get_context_document()
+    researcher_agent = next((x for x in registered_agent_acess_points if x.name == 'researcher'), None)
+    manager_agent = next((x for x in registered_agent_acess_points if x.name == 'manager'), None)
+    
     if not context_doc:
-        researcher_agent.set_available()
-        manager_agent.set_available(False)
+        if researcher_agent:
+            researcher_agent.set_available()
+        if manager_agent:
+            manager_agent.set_available(False)
     else:
-        researcher_agent.set_available(False)
-        manager_agent.set_available()
+        if researcher_agent:
+            researcher_agent.set_available(False)
+        if manager_agent:
+            manager_agent.set_available()
+    
+    # DEBUG: Forcing to see if it works. Remove later
+    manager_agent.set_available()
 
 def get_token_from_request(request: Request) -> str:
     auth_header = request.headers.get("authorization")
@@ -301,6 +322,8 @@ async def create_new_chat(userdata: dict = Depends(get_current_user)):
 
 @app.post("/api/chat/{agent_name}/message/{chat_id}")
 async def send_agent_message(agent_name: str, chat_id: str, payload: dict, userdata: dict = Depends(get_current_user)):
+    evaluate_agent_status()
+    print(registered_agent_acess_points)
     username = userdata["user"]
     agent = None
     for agent_acesspoint in registered_agent_acess_points:
