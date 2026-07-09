@@ -1,106 +1,466 @@
-# Agente organizador de equipe não nomeado
+# Maestro
 
-Ideias de nomes:
-- Maestro
+> Um gerente de projeto assistido por IA que mantém o estado do projeto, propõe tarefas e ajuda equipes pequenas a transformar objetivos em entregas.
 
 ## O problema
-Somos uma equipe formada pro 4 profissionais técnicos. Somos bons em criar coisas, mas não tanto em organizar o que precisamos criar.
 
-Temos uma visão do que queremos criar e por que. Somos simultaneamente os stakeholders do projeto e seus desenvolvedores.
+Equipes pequenas costumam ter uma característica curiosa:
 
-Os problemas que enfrentamos são:
-- Apenas um de nós cria quase todo o código com um agente de IA. Chamaremos de "O Visionário", aquele que cria a base das ideias dos projetos.
-- Muito codigo, documentos e features são criados em pouco tempo, mas não sabemos como entregar, como vender o que criamos, nem sabemos se falta algo para entregar.
-- Dois acabam não fazendo nada por não saberem o que precisa ser feito. Vamos chamá-los de "Os Contratados"
-- Um entende mais de tecnologia e consegue analisar arquitetura de tecnologia mais profundamente, mas não entende bem de criar tarefas e comunicação. Vamos chama-lo de "O Nerd"
-- No fim não temos um roadmap, apenas estamos adicionando coisas à um projeto sem saber como transformá-lo em um produto de verdade.
+Todo mundo sabe construir.
 
-A solução que quero criar deve:
-- Ajudar a organizar as tarefas que cada um deve fazer, dividir objetivos de negócio em tarefas técnicas.
-- Agir como um gerente que escuta as necessidades de negócio e as converte/distribui para quem irá executá-las.
-- Entender o custo de cada demanda, o custo de cada decisão, baseado no contexto como um todo.
-- O agente deve nos alinhar como devs as decisões de negócios que tomamos, e como stakeholders as limitações técnicas que temos.
-- Deixar claro quando houver desalinhamento no projeto e na equipe.
-- Garantir que cheguemos à um produto final e não fiquemos apenas adicionando coisas ad eternum.
-- Garantir que todos participem e contribuam para o projeto.
-- Ser adaptável e genérica o suficiente para que possa ser usada em outros contextos. O problema que trouxe é um case que esse agente deve solucionar, mas não o unico.
+Poucos sabem organizar.
 
+No nosso caso somos quatro desenvolvedores construindo uma startup.
 
-## Front end
+O conhecimento fica concentrado em uma pessoa.
 
-Preciso fazer esse agente ser acessível para a equipe. Pensei no seguinte setup:
+As decisões acontecem em conversas.
 
-- Static (HTML + CSS + JS) por simplicidade
-    - Pagina de login para evitar abuso do limite do agente
-    - Pagina de chat já criada (agent-showcase-base), mas precisa ser adaptada para ser usada em servidor
-- Fast-API para o backend. Precisa ser agnostico pois ainda não sabemos qual cloud vamos usar·
-    - JWT para controle de acesso
-    - Duas rotas de get, login e chat
-    - Usando Render por enquanto pelo free tier
-- Agnostico para banco de dados tambem, pelo mesmo motivo
-    - Temporariamente Firebase por ser de gratis (Tanto historico de conversa quanto documento de contexto salvo)
-    - Autenticação é registrada manualmente pelo admin
-    - Database de usuário e chat
+As tarefas não são explícitas.
 
+O roadmap muda constantemente.
 
-### Passo 1 - Fast API Rodando
-Vamos fazer isso incrementalmente. Botando o servidor pra rodar, depois vamos adicionando as paginas e funcionalidades.
+Como consequência:
 
-Rodar o servidor, configurar as rotas e os Settings vão ser todos no server.py
+- ninguém sabe exatamente o que fazer hoje;
+- novas funcionalidades aparecem antes das antigas terminarem;
+- o projeto evolui sem uma direção clara;
+- decisões importantes se perdem em conversas;
+- documentação fica desatualizada;
+- pessoas deixam de contribuir simplesmente porque não sabem onde ajudar.
 
-Vamos usar pydantic-settings para automatizar validação de existencia de variáveis necessárias e conversão de tipos.
+Esse problema não é exclusivo da nossa equipe.
 
-_uvicorn_ para rodar o servidor localmente, mas deixar aberto para funcionar em container futuramente (mais facil de botar na cloud).
+Ferramentas como Jira, Trello e Notion armazenam informação, mas dependem que alguém organize tudo manualmente.
 
-Para rodar o aplicativo:
+O Maestro nasce para diminuir esse trabalho.
+
+---
+
+# Objetivo
+
+O objetivo do Maestro não é substituir um gerente.
+
+Seu objetivo é responder continuamente perguntas como:
+
+- Qual minha tarefa hoje?
+- O que falta para entregar o MVP?
+- Quem está responsável por isso?
+- Existe algum bloqueio?
+- Essa decisão já foi tomada?
+- O que mudou desde ontem?
+- Essa funcionalidade já existe?
+
+---
+
+# MVP
+
+O primeiro MVP terá apenas um fluxo principal.
+
 ```
-uvicorn backend.server:app --reload
+Funcionário
+
+↓
+
+"Qual minha tarefa hoje?"
+
+↓
+
+Maestro
+
+↓
+
+Analisa
+
+- Estado do projeto
+- Objetivo atual
+- Perfil do colaborador
+- Dependências
+- Prioridades
+
+↓
+
+Propõe uma tarefa
+
+↓
+
+Funcionário aceita
+
+↓
+
+Cria automaticamente um card no Trello
+
+↓
+
+Ao finalizar
+
+↓
+
+Atualiza o estado do projeto
 ```
 
-### Passo 2 - Páginas Estáticas
-Precisamos de duas páginas estáticas:
-- Login
-- Chat (Já temos, só precisamos adaptar a logica)
+Esse fluxo já resolve um problema real da equipe.
 
-Se os dois GETs estiverem funcionando, ta ok
+---
 
-_O que seria adaptar a lógica?_  
-No momento a página executa lógica de backend no front. Precisamos colocar toda a lógica de chamada de agente, acesso de arquivos, etc, no backend, para que o front apenas chame os endpoints.
+# Como o Maestro funciona
 
-Se
-### Passo 3 - Endpoints
-- Login
-- Logout
-- Me
-- Chat
-- Conversations
-- Conversations (ID)
-- Context Doc
+O Maestro trabalha sobre um **Estado do Projeto**.
 
-### Passo 4 - Requests
-Objetos para validar formato da requisição do usuário ao servidor
+Esse estado representa a verdade atual do projeto.
 
-### Passo 5 - Serviços
-Lógica de negócio para rodar autenticação e comunicação com a LLM
+Exemplo:
 
-Quando o primeiro agente rodar, salva o documento de contexto na database.
+```
+Projeto
 
-### Passo 6 - Separação
-Endpoints vão para API, Logica de negócios para Serviços
+Objetivo Atual
 
-### Passo 7 - Database agnóstica
-Abstrações para acesso de databases.
+Equipe
 
-Usuários, chat, documento de contexto.
+Tarefas
 
-Definição de forma de dados é nos modelos.
+Decisões
 
-### Passo 8 - Modelos
-Entidades de negócio: user, chat e message.
+Roadmap
 
-### Passo 9 - Main
-Servidor inicializado pela main, com o agente sendo configurado antes e depois passado para o servidor.
+Riscos
 
-O objetivo disso é poder separar e testar individualmente a lógica do agente e das tools, sem precisar rodar o servidor pra isso.
+Arquitetura
 
-Em vez do backend se comunicar diretamente com o Groq, quem configura os objetos de agente para se comunicarem com o Groq é ```main.py``` e ```agent.py```, depois disponibilizando o objeto criado para o servidor. Ainda não sei como passar os objetos para a camada de negócio, é uma coisa que preciso ver ainda.
+Documentação
+```
+
+Esse estado possui versionamento.
+
+Toda alteração gera uma nova versão.
+
+O histórico nunca é perdido.
+
+---
+
+# Fontes de conhecimento
+
+O estado inicial é construído a partir de diferentes fontes.
+
+## Código
+
+O código fonte é analisado por um LLM.
+
+O objetivo não é responder perguntas sobre código.
+
+O objetivo é extrair conhecimento como:
+
+- arquitetura
+- funcionalidades existentes
+- módulos
+- tecnologias utilizadas
+- responsabilidades
+
+---
+
+## Documentação
+
+README
+
+Documentos técnicos
+
+Documentação de negócio
+
+---
+
+## Contexto de negócio
+
+- Mercado financeiro
+- BACEN
+- Ouvidorias
+- Clientes
+- Concorrentes
+- Estratégia
+
+---
+
+## Equipe
+
+Cada colaborador possui um perfil.
+
+Exemplo:
+
+- tecnologias dominadas
+- disponibilidade
+- responsabilidades
+- interesses
+
+---
+
+## Conversas
+
+As conversas não representam a verdade.
+
+Elas geram propostas de alteração no estado.
+
+---
+
+# Estado do Projeto
+
+O Estado do Projeto é o núcleo do Maestro.
+
+Ele contém informações estruturadas.
+
+Exemplo:
+
+```
+Objetivos
+
+Tarefas
+
+Riscos
+
+Decisões
+
+Roadmap
+
+Equipe
+
+Dependências
+
+Arquitetura
+
+Documentação
+```
+
+Toda alteração gera uma nova versão.
+
+Nenhuma informação é sobrescrita.
+
+---
+
+# Papel do RAG
+
+O RAG NÃO guarda o estado do projeto.
+
+Ele serve para responder perguntas usando:
+
+- código
+- documentação
+- mercado
+- negócio
+
+Exemplos:
+
+"Como funciona essa feature?"
+
+"Qual documento fala sobre isso?"
+
+"Onde essa decisão foi tomada?"
+
+---
+
+# Papel do Agente
+
+O agente trabalha sobre o Estado do Projeto.
+
+Seu trabalho é:
+
+- responder perguntas
+- propor tarefas
+- detectar bloqueios
+- atualizar o estado
+- registrar decisões
+- criar cartões no Trello
+- identificar desalinhamentos
+
+O agente nunca modifica o estado diretamente.
+
+Ele propõe alterações.
+
+Após confirmação, uma nova versão do estado é criada.
+
+---
+
+# Fluxos do MVP
+
+## Fluxo 1
+
+Pergunta
+
+> Qual minha tarefa hoje?
+
+Resposta
+
+- analisa objetivo atual
+- analisa backlog
+- analisa perfil do colaborador
+- propõe uma tarefa
+
+Após confirmação
+
+- cria card no Trello
+- registra responsável
+
+---
+
+## Fluxo 2
+
+Pergunta
+
+> Terminei.
+
+Resposta
+
+- move cartão
+- pergunta o que mudou
+- atualiza estado
+- identifica tarefas desbloqueadas
+
+---
+
+## Fluxo 3
+
+Pergunta
+
+> Estou bloqueado.
+
+Resposta
+
+- registra bloqueio
+- identifica responsável
+- cria ação para resolver
+
+---
+
+# Arquitetura
+
+```
+                  Código
+
+              Documentação
+
+               Negócio
+
+                Equipe
+
+                    │
+
+             Processamento
+
+                    │
+
+                 RAG Index
+
+                    │
+
+            Estado do Projeto
+              (Versionado)
+
+                    │
+
+          Agente Conversacional
+
+                    │
+
+        Trello / Usuários / Chat
+```
+
+---
+
+# Stack
+
+## Backend
+
+FastAPI
+
+Pydantic Settings
+
+JWT
+
+Firebase (temporário)
+
+---
+
+## IA
+
+LangGraph
+
+LangChain (apenas onde fizer sentido)
+
+Groq
+
+---
+
+## Frontend
+
+HTML
+
+CSS
+
+JavaScript
+
+---
+
+# Roadmap
+
+## Fase 1
+
+Estado do Projeto
+
+- modelo
+- versionamento
+- persistência
+
+---
+
+## Fase 2
+
+Indexador
+
+- código
+- documentação
+- negócio
+- equipe
+
+---
+
+## Fase 3
+
+RAG
+
+Consulta das fontes de conhecimento.
+
+---
+
+## Fase 4
+
+Agente
+
+Responder:
+
+"Qual minha tarefa hoje?"
+
+---
+
+## Fase 5
+
+Integração Trello
+
+Criação automática de cartões.
+
+---
+
+## Fase 6
+
+Atualização automática do Estado do Projeto
+
+Após conclusão das tarefas.
+
+---
+
+# Objetivos futuros
+
+- Detecção automática de riscos
+- Sugestão de roadmap
+- Identificação de gargalos
+- Atualização automática da documentação
+- Planejamento de entregas
+- Métricas de produtividade
+- Auditoria contínua do projeto
