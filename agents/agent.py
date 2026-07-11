@@ -11,23 +11,33 @@ from .model import Model
 
 class Agent:
     
-    def __init__(self, model: Model, system_prompt="", tools=[]):
+    def __init__(self, model: Model, system_prompt="", tools=[], checkpointer=None):
         self.model = model
         self.system_prompt = system_prompt
         self.tools = tools
+        self.checkpointer = checkpointer
         self.agent = self._instantiate_agent()
-        
+
+                
     def _instantiate_agent(self):
-        agent = create_agent(self.model.llm, tools=self.tools, system_prompt=self.system_prompt)
+        if self.checkpointer:
+            agent = create_agent(self.model.llm, tools=self.tools, system_prompt=self.system_prompt, checkpointer=self.checkpointer)
+        else:
+            agent = create_agent(self.model.llm, tools=self.tools, system_prompt=self.system_prompt)
         return agent
     
-    def send_message(self, message, message_history = []):
-        result = self.agent.invoke(
-            {"messages": message_history + [{"role": "user", "content": message}]}
+    def send_message(self, message, message_history = [], thread_id: str = ""):
+        if self.checkpointer and thread_id.strip():
+            config = {"configurable": {"thread_id": thread_id}}
+            result = self.agent.invoke(
+            {"messages": [{"role": "user", "content": message}]},
+            config=config
         )
+        else:
+            result = self.agent.invoke(
+                {"messages": message_history + [{"role": "user", "content": message}]}
+            )
         
-        # DEBUG: Remove later
-        print(result)
         return result['messages'][-1].content
 
     
