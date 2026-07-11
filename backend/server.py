@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from agents.agent import Agent
 from agents.model import Model
 from agents import Providers, LLMs
+from agents.checkpointers import FirestoreCheckpointSaver
 
 from fastapi import Depends, FastAPI, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
@@ -111,26 +112,10 @@ class ChatDatabase:
         doc_ref = self.collection.document()
         doc_ref.set({
             "username": username,
-            "messages": [],
             "created_at": firestore.SERVER_TIMESTAMP,
             "updated_at": firestore.SERVER_TIMESTAMP
         })
         return doc_ref.id
-        
-    def get_chat_history(self, chat_id: str) -> list:
-        doc_ref = self.collection.document(chat_id)
-        doc = doc_ref.get()
-        if not doc.exists:
-            return []
-        return doc.to_dict().get("messages", [])
-    
-    def save_history(self, chat_id: str, messages: list):
-        doc_ref = self.collection.document(chat_id)
-        doc_ref.set({
-            "messages": messages,
-            "updated_at": firestore.SERVER_TIMESTAMP
-        }, merge=True)
-        return True
     
     def get_chat_id_by_user(self, username: str) -> list:
         docs = self.collection.where("username", "==", username).stream()
@@ -185,7 +170,9 @@ with open("chat_agent/prompts/maestromanager.md", encoding="utf-8") as file:
     
 # researcher_agent = AgentAcessPoint("researcher", Agent(SOURCE, settings.groq_key, RESEARCHER_PROMPT, [save_context_doc_tool], MODEL)
 manager_model = Model(SOURCE, MODEL, settings.groq_key)
-manager_agent = AgentAcessPoint("manager", Agent(manager_model, f"{MANAGER_PROMPT} \n # Contexto Atual: \n {proj_ctx_srv.get_project_markdown()}"))
+manager_agent = AgentAcessPoint("manager", Agent(manager_model, 
+                                                 f"{MANAGER_PROMPT} \n # Contexto Atual: \n {proj_ctx_srv.get_project_markdown()}",
+                                                 checkpointer=FirestoreCheckpointSaver(firestore_client=firestore_client)))
 
 registered_agent_acess_points = [manager_agent]
 
@@ -311,8 +298,33 @@ async def get_chat_id_from_user(userdata: dict = Depends(get_current_user)):
     return {"id_list": chat_db.get_chat_id_by_user(username)}
 
 @app.get("/api/history/{chat_id}")
-async def get_chat_history(chat_id: str) -> dict:
-    return {"messages": chat_db.get_chat_history(chat_id)}
+async def get_chat_history(chat_id: str, userdata: dict = Depends(get_current_user)) -> dict:
+    username = userdata["user"]
+    if chat_id not in chat_db.get_chat_id_by_user(username):
+        return JSONResponse(status_code=403, content={"detail": "chat does not belong to user"})
+    
+    # TODO: Make this dynamic to not access manager agent directly
+    agent = manager_agent.agent.agent  # o CompiledStateGraph dentro da sua classe Agent
+    config = {"configurable": {"thread_id": chat_id}}
+
+    try:
+        state = agent.get_state(config)
+        if not state.values:
+                return {"messages": []}
+    except ValueError:
+        return {"messages": []}
+    
+    messages = state.values.get("messages", [])
+    return {"messages": [_serialize_message(m) for m in messages]}
+
+def _serialize_message(message) -> dict:
+    # Mapeia o "type" do LangChain (human/ai/tool/system) pro formato
+    # {"role", "content"} que seu front já espera hoje
+    role_map = {"human": "user", "ai": "assistant", "tool": "tool", "system": "system"}
+    return {
+        "role": role_map.get(message.type, message.type),
+        "content": message.content,
+    }
 
 @app.post("/api/chat/newchat")
 async def create_new_chat(userdata: dict = Depends(get_current_user)):
@@ -323,7 +335,6 @@ async def create_new_chat(userdata: dict = Depends(get_current_user)):
 @app.post("/api/chat/{agent_name}/message/{chat_id}")
 async def send_agent_message(agent_name: str, chat_id: str, payload: dict, userdata: dict = Depends(get_current_user)):
     evaluate_agent_status()
-    print(registered_agent_acess_points)
     username = userdata["user"]
     agent = None
     for agent_acesspoint in registered_agent_acess_points:
@@ -334,11 +345,13 @@ async def send_agent_message(agent_name: str, chat_id: str, payload: dict, userd
             
     if agent == None:
         return JSONResponse(status_code=500, content={"detail":f"Unknow agent {agent_name}"})
-        
-    chat_history = chat_db.get_chat_history(chat_id)
+    
+    if chat_id not in chat_db.get_chat_id_by_user(username):
+        return JSONResponse(status_code=403, content={"detail": "chat does not belong to user"})
+    
     formated_message = f"USUARIO: {username} MENSAGEM: { payload['message'] }"
     try:
-        response = agent.send_message(formated_message, chat_history)
+        response = agent.send_message(formated_message, thread_id=chat_id)
     except RateLimitError as exc:
         return JSONResponse(
             status_code=200,
@@ -350,9 +363,6 @@ async def send_agent_message(agent_name: str, chat_id: str, payload: dict, userd
             detail=e
         )
     
-    chat_history.append({"role": "user", "content" : payload['message']})
-    chat_history.append({"role": "assistant", "content" : response})
-    chat_db.save_history(chat_id, chat_history)
     return {"response" : response}
     
 app.mount("/", StaticFiles(directory="./front", html=True), name="static")
