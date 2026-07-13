@@ -51,6 +51,10 @@ class ProjectContextService:
 
     def update_task(self, id):
         self._save()
+        
+    def update_document(self, doc: ProjectContextData):
+        self._current_document = doc
+        self._save()
 
     def get_tarefas(self):
         return self._current_document['tarefas']
@@ -77,115 +81,118 @@ class ProjectContextService:
         else:
             return next((x for x in roadmap if x.get('passo',-1) == step), None) 
         
-    def get_project(self):
+    def get_project(self) -> ProjectContextData | None:
         return self._current_document
     
     def get_project_markdown(self) -> str:
         doc = self.get_project()
-        lines: list[str] = []
+        if doc:
+            lines: list[str] = []
 
-        lines.append("# Estado do Projeto")
-        lines.append("")
-        lines.append(f"**Versão:** {doc['version']}")
-        lines.append("")
-
-        # Objetivo
-        lines.append("## Objetivo")
-        lines.append(doc["objetivo"] or "_Não definido._")
-        lines.append("")
-
-        # Roadmap
-        lines.append("## Roadmap")
-
-        if doc["roadmap"]:
-            for step in sorted(doc["roadmap"], key=lambda s: s["passo"]):
-                lines.append(
-                    f"{step['passo']}. **{step['titulo']}**"
-                )
-
-                if step["descricao"]:
-                    lines.append(f"   - {step['descricao']}")
-        else:
-            lines.append("_Nenhum passo definido._")
-
-        lines.append("")
-
-        # Equipe
-        lines.append("## Equipe")
-
-        if doc["pessoas"]:
-            for dev in doc["pessoas"]:
-                lines.append(f"### {dev['nome']}")
-
-                skills = ", ".join(dev["skills"]) if dev["skills"] else "Nenhuma"
-
-                current = (
-                    ", ".join(map(str, dev["current_tasks_ids"]))
-                    if dev["current_tasks_ids"]
-                    else "Nenhuma"
-                )
-
-                lines.append(f"- Skills: {skills}")
-                lines.append(f"- Tarefas atuais: {current}")
-                lines.append("")
-        else:
-            lines.append("_Nenhum colaborador cadastrado._")
+            lines.append("# Estado do Projeto")
+            lines.append("")
+            lines.append(f"**Versão:** {doc['version']}")
             lines.append("")
 
-        # Tarefas
-        lines.append("## Tarefas")
-
-        if doc["tarefas"]:
-            for task in doc["tarefas"]:
-                lines.append(f"### #{task['id']} - {task['titulo']}")
-
-                lines.append(f"- Status: {task['status']}")
-                lines.append(f"- Prioridade: {task['prioridade']}")
-
-                responsavel = task["responsavel"] or "Não atribuído"
-
-                lines.append(f"- Responsável: {responsavel}")
-
-                if task["descricao"]:
-                    lines.append(f"- Descrição: {task['descricao']}")
-
-                if task["skills"]:
-                    lines.append(
-                        "- Skills necessárias: "
-                        + ", ".join(task["skills"])
-                    )
-
-                if task["dependencias"]:
-                    lines.append(
-                        "- Dependências: "
-                        + ", ".join(map(str, task["dependencias"]))
-                    )
-
-                lines.append("")
-        else:
-            lines.append("_Nenhuma tarefa cadastrada._")
+            # Objetivo
+            lines.append("## Objetivo")
+            lines.append(doc["objetivo"] or "_Não definido._")
             lines.append("")
 
-        # Decisões
-        lines.append("## Decisões")
+            # Roadmap
+            lines.append("## Roadmap")
 
-        if doc["decisoes"]:
-            for decision in doc["decisoes"]:
-                lines.append(f"- {decision}")
+            if doc["roadmap"]:
+                for step in sorted(doc["roadmap"], key=lambda s: s["passo"]):
+                    lines.append(
+                        f"{step['passo']}. **{step['titulo']}**"
+                    )
+
+                    if step["descricao"]:
+                        lines.append(f"   - {step['descricao']}")
+            else:
+                lines.append("_Nenhum passo definido._")
+
+            lines.append("")
+
+            # Equipe
+            lines.append("## Equipe")
+
+            if doc["pessoas"]:
+                for dev in doc["pessoas"]:
+                    lines.append(f"### {dev['nome']}")
+
+                    skills = ", ".join(dev["skills"]) if dev["skills"] else "Nenhuma"
+
+                    current = (
+                        ", ".join(map(str, dev["current_tasks_ids"]))
+                        if dev["current_tasks_ids"]
+                        else "Nenhuma"
+                    )
+
+                    lines.append(f"- Skills: {skills}")
+                    lines.append(f"- Tarefas atuais: {current}")
+                    lines.append("")
+            else:
+                lines.append("_Nenhum colaborador cadastrado._")
+                lines.append("")
+
+            # Tarefas
+            lines.append("## Tarefas")
+
+            if doc["tarefas"]:
+                for task in doc["tarefas"]:
+                    lines.append(f"### #{task['id']} - {task['titulo']}")
+
+                    lines.append(f"- Status: {task['status']}")
+                    lines.append(f"- Prioridade: {task['prioridade']}")
+
+                    responsavel = task["responsavel"] or "Não atribuído"
+
+                    lines.append(f"- Responsável: {responsavel}")
+
+                    if task["descricao"]:
+                        lines.append(f"- Descrição: {task['descricao']}")
+
+                    if task["skills"]:
+                        lines.append(
+                            "- Skills necessárias: "
+                            + ", ".join(task["skills"])
+                        )
+
+                    if task["dependencias"]:
+                        lines.append(
+                            "- Dependências: "
+                            + ", ".join(map(str, task["dependencias"]))
+                        )
+
+                    lines.append("")
+            else:
+                lines.append("_Nenhuma tarefa cadastrada._")
+                lines.append("")
+
+            # Decisões
+            lines.append("## Decisões")
+
+            if doc["decisoes"]:
+                for decision in doc["decisoes"]:
+                    lines.append(f"- {decision}")
+            else:
+                lines.append("_Nenhuma decisão registrada._")
+
+            lines.append("")
+
+            # Riscos
+            lines.append("## Riscos")
+
+            if doc["riscos"]:
+                for risk in doc["riscos"]:
+                    lines.append(f"- {risk}")
+            else:
+                lines.append("_Nenhum risco registrado._")
+
+            lines.append("")
+
+            return "\n".join(lines)
         else:
-            lines.append("_Nenhuma decisão registrada._")
-
-        lines.append("")
-
-        # Riscos
-        lines.append("## Riscos")
-
-        if doc["riscos"]:
-            for risk in doc["riscos"]:
-                lines.append(f"- {risk}")
-        else:
-            lines.append("_Nenhum risco registrado._")
-
-        lines.append("")
-
-        return "\n".join(lines)
+            return ''

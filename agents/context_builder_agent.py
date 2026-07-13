@@ -11,11 +11,14 @@ class ContextBuilderAgent:
         source: str
         summary: str
     
-    def __init__(self, model: Model, system_prompt="", tools=[], checkpointer=None, loaders: list[Loader] = []):
+    def __init__(self, model: Model, system_prompt="", tools=[], checkpointer=None, loaders: list[Loader] = [], summarizer_model: Model = None):
         self.loaders = loaders
         self.model = model
         self.answer_llm = self.model.llm.with_structured_output(ProjectContextData, method="json_mode")
-        self.summarizer = SummarizerAgent(model)
+        if not summarizer_model:
+            self.summarizer = SummarizerAgent(model)
+        else:
+            self.summarizer = SummarizerAgent(summarizer_model)
         # self.system_prompt = ''
         # self.agent = self._instantiate_agent()
 
@@ -60,6 +63,53 @@ class ContextBuilderAgent:
         Nunca invente informações.
 
         Caso alguma informação não exista, utilize listas vazias ou textos vazios.
+        
+        Liste decisões técnicas ou de produto explicitamente observáveis.
+
+        Considere como decisão:
+
+        - tecnologias utilizadas;
+        - arquitetura adotada;
+        - integrações existentes;
+        - padrões arquiteturais;
+        - divisão em agentes;
+        - banco de dados escolhido.
+
+        Não invente decisões que não possam ser observadas.
+        
+        roadmap:
+
+        Preencha SOMENTE se existir uma sequência explícita de etapas.
+
+        Não transforme funcionalidades em roadmap.
+        
+        objetivo
+        → Objetivo do Produto
+
+        decisoes
+        → Arquitetura
+        → Stack
+        → Tecnologias
+        → Integrações
+        → Banco de Dados
+        → Pipeline
+        → Frameworks
+
+        roadmap
+        → Roadmap
+        → Etapas
+        → Próximas entregas
+
+        pessoas
+        → Equipe
+        → Autores
+        → Responsáveis
+
+        riscos
+        → Limitações
+        → Problemas conhecidos
+        → Riscos
+        → TODO
         
         Documentos:
         {kss}
@@ -112,6 +162,7 @@ class ContextBuilderAgent:
     def build_context(self) -> dict:
         prompt = self._build_prompt()
         print(f"DEBUG: {prompt}")
-        pcd : ProjectContextData = self.answer_llm.invoke(prompt)['ProjectContextData']
-        
+        pcd : ProjectContextData = self.answer_llm.invoke(prompt)
+        if 'ProjectContextData' in pcd.keys():
+            return pcd['ProjectContextData']
         return pcd

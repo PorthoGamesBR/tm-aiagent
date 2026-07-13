@@ -13,7 +13,7 @@ class ProjectContextDatabase:
         doc_ref.set(project_context)
         return True
     
-    def load(self, doc_version: str = "current") -> ProjectContextData:
+    def load(self, doc_version: str = "current") -> ProjectContextData | None:
         doc_ref = self.collection.document(doc_version)
         doc = doc_ref.get()
         if not doc.exists:

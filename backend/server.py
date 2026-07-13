@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from agents.agent import Agent
 from agents.model import Model
-from agents import Providers, LLMs
+from agents import Providers, LLMs, ContextBuilderAgent
 from agents.checkpointers import FirestoreCheckpointSaver
 
 from fastapi import Depends, FastAPI, HTTPException, status, Request
@@ -25,6 +25,7 @@ from groq import RateLimitError
 
 from .project_context_database import ProjectContextDatabase
 from .project_context_service import ProjectContextService
+from .context import GithubLoader
 
 class Settings(BaseSettings):
     groq_key: str
@@ -34,6 +35,11 @@ class Settings(BaseSettings):
     encrypt_algorithm: str = "HS256"
     token_expire_minutes: int = 30
     database_provider: str = "firebase"
+    github_user: str
+    github_repo: str
+    github_api_token: str
+    github_ignored_files: str = ''
+    
     model_config = SettingsConfigDict(
         env_file=".env"
     )
@@ -158,6 +164,19 @@ chat_db = ChatDatabase(firestore_client)
 proj_ctx_db = ProjectContextDatabase(firestore_client)
 proj_ctx_srv = ProjectContextService(proj_ctx_db)
 
+# Configures the context if it does not exist
+context = proj_ctx_db.load()
+
+if context is None:
+    cba_model = Model(Providers.GROQ, model=LLMs.LLAMA, api_key=settings.groq_key)
+    summary_model = Model(Providers.GROQ, model=LLMs.LLAMA_INSTRUCT, api_key=settings.groq_key, temperature=0.0)
+    loaders = [
+        GithubLoader(owner=settings.github_user, repo=settings.github_repo, token=settings.github_api_token,commit_limit=5, excluded_documents=settings.github_ignored_files.split(','))
+    ]
+    cba = ContextBuilderAgent(cba_model, loaders=loaders, summarizer_model=summary_model)
+    context = cba.build_context()
+    proj_ctx_srv.update_document(context)
+                            
 # Agent Configuration
 SOURCE = Providers.GROQ
 MODEL = LLMs.LLAMA
@@ -182,6 +201,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 
 app = FastAPI()
 
+    
 # UTILS
 def create_access_token(data: dict):
     to_encode = data.copy()
