@@ -26,6 +26,7 @@ from groq import RateLimitError
 from .project_context_database import ProjectContextDatabase
 from .project_context_service import ProjectContextService
 from .context import GithubLoader
+from .project_context_service_tools import build_project_context_tools
 
 class Settings(BaseSettings):
     groq_key: str
@@ -191,7 +192,8 @@ with open("chat_agent/prompts/maestromanager.md", encoding="utf-8") as file:
 manager_model = Model(SOURCE, MODEL, settings.groq_key)
 manager_agent = AgentAcessPoint("manager", Agent(manager_model, 
                                                  f"{MANAGER_PROMPT} \n # Contexto Atual: \n {proj_ctx_srv.get_project_markdown()}",
-                                                 checkpointer=FirestoreCheckpointSaver(firestore_client=firestore_client)))
+                                                 checkpointer=FirestoreCheckpointSaver(firestore_client=firestore_client),
+                                                 tools=build_project_context_tools(proj_ctx_srv)))
 
 registered_agent_acess_points = [manager_agent]
 
@@ -380,7 +382,7 @@ async def send_agent_message(agent_name: str, chat_id: str, payload: dict, userd
     except Exception as e:
         raise HTTPException(
             status_code=500, 
-            detail=e
+            detail=str(e)
         )
     
     return {"response" : response}

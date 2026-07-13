@@ -96,9 +96,7 @@ async function loadChat(id) {
 
 async function loadChats() {
   chatIds = (await get_endpoint("/api/chats"))["id_list"]
-  chatIds.forEach(id => {
-    loadChat(id)
-  })
+  await Promise.all(chatIds.map(id => loadChat(id)))
 }
 
 
@@ -127,7 +125,6 @@ async function updateAgentStatus() {
 // ═══════════════════════════════════════════════
 
 function renderChatList() {
-  loadChats();
   const list  = document.getElementById("chat-list");
   const ids   = chatIds.sort();
   const hasCtx = isContextDocAvailable();

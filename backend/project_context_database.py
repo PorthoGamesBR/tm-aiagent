@@ -58,7 +58,7 @@ class ProjectContextDatabase:
     def _dict_to_project_context_data(data) -> dict:
         pcd : ProjectContextData = {
             'objetivo': data.get('objetivo', ''),
-            'tarefas': [ProjectContextDatabase._dict_to_project_context_data(d) for d in data.get('tarefas',[])],
+            'tarefas': [ProjectContextDatabase._dict_to_project_task(d) for d in data.get('tarefas',[])],
             'pessoas': [ProjectContextDatabase._dict_to_project_dev_profile(d) for d in data.get('pessoas',[])],
             'decisoes': [s for s in data.get('decisoes',[])],
             'riscos': [s for s in data.get('riscos',[])],

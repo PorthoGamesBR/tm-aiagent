@@ -1,5 +1,5 @@
 from .project_context_database import ProjectContextDatabase
-from .project_context import ProjectContextData
+from .project_context import ProjectContextData, ProjectTask
 
 class ProjectContextService:
 
@@ -33,24 +33,96 @@ class ProjectContextService:
         if self._last_doc_version:
             int_version = int(self._last_doc_version[1:])
         return f'v{int_version+1}'
-
-    def assign_task(self):
+    
+    def add_task(self, titulo: str, descricao: str, prioridade: str, status: str, skills: list[str], dependencias: list[str] = []) -> int:
+        tasks = self._current_document.get('tarefas',[])
+        if len(tasks) <= 0:
+            id = 1
+        else:
+            id = max(tasks, key=lambda x: x["id"])['id'] + 1
+        
+        new_task : ProjectTask = {'id':id,
+                                  'titulo':titulo, 
+                                  'descricao':descricao, 
+                                  'prioridade':prioridade, 
+                                  'status': status, 
+                                  'dependencias':dependencias, 
+                                  'skills':skills, 
+                                  'responsavel':''}
+        tasks.append(new_task)
         self._save()
+        return id
 
-    def finish_task(self):
-        self._save()
+    def assign_task(self, task_id: int, nome_responsavel: str, status: str) -> int:
+        tasks = self._current_document.get('tarefas',[])
+        if len(tasks) <= 0:
+            return -1
+        task = next((obj for obj in tasks if obj['id'] == task_id), None)
+        if not task:
+            return -1
 
-    def add_decision(self):
-        self._save()
+        task["responsavel"] = nome_responsavel
+        task['status'] = status
+        
+        developer = self.get_pessoa(nome_responsavel)
 
-    def add_risk(self):
-        self._save()
+        if developer:
+            developer["current_tasks_ids"].append(task["id"])
 
-    def add_task(self):
         self._save()
+        return task["id"]
 
-    def update_task(self, id):
+    def finish_task(self, task_id: int) -> int:
+        tasks = self._current_document.get('tarefas',[])
+        if len(tasks) <= 0:
+            return -1
+        task = next((obj for obj in tasks if obj['id'] == task_id), None)
+        if not task:
+            return -1
+        
+        task['status'] = "FINALIZADO"
         self._save()
+        return task['id']
+
+    def update_task(self, task_id: int, 
+                    titulo: str = None, 
+                    descricao: str = None, 
+                    prioridade: str = None, 
+                    status: str = None, 
+                    skills: list[str] = [], 
+                    dependencias: list[str] = []) -> int:
+        tasks = self._current_document.get('tarefas',[])
+        if len(tasks) <= 0:
+            return -1
+        task = next((obj for obj in tasks if obj['id'] == task_id), None)
+        if not task:
+            return -1
+        
+        if titulo:
+            task["titulo"] = titulo
+        if descricao:
+            task['descricao'] = descricao
+        if prioridade:
+            task['prioridade'] = prioridade
+        if status:
+            task['status'] = status
+        if len(skills) > 0:
+            task['skills'] = skills
+        if len(dependencias) > 0:
+            task['dependencias'] = dependencias
+   
+        self._save()
+        return task['id']
+        
+    def add_decision(self, decisao: str):
+        if decisao not in self._current_document["decisoes"]:
+            self._current_document["decisoes"].append(decisao)
+            self._save()
+
+    def add_risk(self, risco: str):        
+        if risco not in self._current_document["riscos"]:
+            self._current_document["riscos"].append(risco)
+            self._save()
         
     def update_document(self, doc: ProjectContextData):
         self._current_document = doc
@@ -63,7 +135,7 @@ class ProjectContextService:
         return self._current_document['pessoas']
     
     def get_pessoa(self, nome):
-        return next((x for x in self.get_pessoa() if x.get('nome','') == nome), None) 
+        return next((x for x in self.get_pessoas() if x.get('nome','') == nome), None) 
     
     def get_decisoes_feitas(self):
         return self._current_document['decisoes']
