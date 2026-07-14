@@ -423,6 +423,54 @@
     letter-spacing: 0.05em;
   }
 
+    /* ── SYSTEM MESSAGES ── */
+  .msg-row.system {
+    align-self: center;
+    max-width: 500px;
+  }
+
+  .msg-bubble.system {
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-style: italic;
+    text-align: center;
+    padding: 4px 10px;
+    border: none;
+  }
+
+  /* ── TOOL MESSAGES ── */
+  .msg-row.tool { align-self: flex-start; }
+
+  .msg-avatar.tool-av {
+    background: #F3E8FF;
+    color: #7E22CE;
+  }
+
+  .msg-bubble.tool {
+    background: #FAF5FF;
+    border: 1px solid #E9D5FF;
+    border-bottom-left-radius: 4px;
+  }
+
+  .msg-bubble.tool .msg-sender {
+    color: #7E22CE;
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .tool-content {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
   /* typing indicator */
   .typing-dots {
     display: flex;

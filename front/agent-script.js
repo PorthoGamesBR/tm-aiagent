@@ -289,10 +289,25 @@ function renderMessages(chat) {
   scrollToBottom();
 }
 
+function scrollToBottom() {
+  const c = document.getElementById("messages");
+  c.scrollTop = c.scrollHeight;
+}
+
 function appendMessage(msg, scroll=true) {
   const container = document.getElementById("messages");
   const empState  = container.querySelector("#empty-state");
   if (empState) empState.remove();
+
+  if (msg.role === "system") {
+    appendSystemMessage(msg, scroll);
+    return;
+  }
+
+  if (msg.role === "tool") {
+    appendToolMessage(msg, scroll);
+    return;
+  }
 
   const isUser = msg.role === "user";
   const userInitials = initials(currentUser);
@@ -316,9 +331,33 @@ function appendMessage(msg, scroll=true) {
   if (scroll) scrollToBottom();
 }
 
-function scrollToBottom() {
-  const c = document.getElementById("messages");
-  c.scrollTop = c.scrollHeight;
+function appendSystemMessage(msg, scroll=true) {
+  const container = document.getElementById("messages");
+  const row = document.createElement("div");
+  row.className = "msg-row system";
+  row.innerHTML = `<div class="msg-bubble system">${escapeHtml(msg.content)}</div>`;
+  container.appendChild(row);
+  if (scroll) scrollToBottom();
+}
+
+function appendToolMessage(msg, scroll=true) {
+  const container = document.getElementById("messages");
+  const row = document.createElement("div");
+  row.className = "msg-row tool";
+
+  row.innerHTML = `
+    <div class="msg-avatar tool-av">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+      </svg>
+    </div>
+    <div class="msg-bubble tool">
+      <div class="msg-sender">Ferramenta</div>
+      <pre class="tool-content">${escapeHtml(msg.content)}</pre>
+    </div>`;
+
+  container.appendChild(row);
+  if (scroll) scrollToBottom();
 }
 
 function showTyping() {

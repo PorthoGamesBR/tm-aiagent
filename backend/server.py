@@ -21,7 +21,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 from langchain_core.tools import tool
-from groq import RateLimitError
+from groq import RateLimitError, APIError
 
 from .project_context_database import ProjectContextDatabase
 from .project_context_service import ProjectContextService
@@ -343,10 +343,13 @@ def _serialize_message(message) -> dict:
     # Mapeia o "type" do LangChain (human/ai/tool/system) pro formato
     # {"role", "content"} que seu front já espera hoje
     role_map = {"human": "user", "ai": "assistant", "tool": "tool", "system": "system"}
-    return {
+    msg = {
         "role": role_map.get(message.type, message.type),
         "content": message.content,
     }
+    if msg['role'] == 'user':
+        msg['content'] = msg['content'].split("MENSAGEM: ")[-1]
+    return msg
 
 @app.post("/api/chat/newchat")
 async def create_new_chat(userdata: dict = Depends(get_current_user)):
@@ -378,6 +381,11 @@ async def send_agent_message(agent_name: str, chat_id: str, payload: dict, userd
         return JSONResponse(
             status_code=200,
             content={"response": str(exc), "detail": "Rate limit exceeded"}
+        )
+    except APIError as exc:
+        return JSONResponse(
+            status_code=200,
+            content={"response": str(exc), "detail": "Error while communicating with Groq API"}
         )
     except Exception as e:
         raise HTTPException(
