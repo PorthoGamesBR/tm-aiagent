@@ -1,5 +1,8 @@
 import json
 from datetime import datetime, timedelta, timezone
+import traceback
+import asyncio
+
 from agents.agent import Agent
 from agents.model import Model
 from agents import Providers, LLMs, ContextBuilderAgent
@@ -8,7 +11,7 @@ from agents.checkpointers import FirestoreCheckpointSaver
 from fastapi import Depends, FastAPI, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -375,24 +378,30 @@ async def send_agent_message(agent_name: str, chat_id: str, payload: dict, userd
         return JSONResponse(status_code=403, content={"detail": "chat does not belong to user"})
     
     formated_message = f"USUARIO: {username} MENSAGEM: { payload['message'] }"
-    try:
-        response = agent.send_message(formated_message, thread_id=chat_id)
-    except RateLimitError as exc:
-        return JSONResponse(
-            status_code=200,
-            content={"response": str(exc), "detail": "Rate limit exceeded"}
-        )
-    except APIError as exc:
-        return JSONResponse(
-            status_code=200,
-            content={"response": str(exc), "detail": "Error while communicating with Groq API"}
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, 
-            detail=str(e)
-        )
+    async def event_generator():
+        gen = agent.stream_message(formated_message, thread_id=chat_id)
+
+        def get_next():
+            try:
+                return next(gen)
+            except StopIteration:
+                return None
+
+        try:
+            while True:
+                event = await asyncio.to_thread(get_next)
+                if event is None:
+                    break
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        except RateLimitError as exc:
+            yield f"data: {json.dumps({'type': 'final', 'content': str(exc)})}\n\n"
+        except APIError as exc:
+            yield f"data: {json.dumps({'type': 'final', 'content': str(exc)})}\n\n"
+        except Exception as e:
+            print("ERRO NO STREAM:", repr(e))
+            print(traceback.format_exc())
+            yield f"data: {json.dumps({'type': 'error', 'content': repr(e) or 'erro desconhecido'})}\n\n"
     
-    return {"response" : response}
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
     
 app.mount("/", StaticFiles(directory="./front", html=True), name="static")

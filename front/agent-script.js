@@ -418,22 +418,58 @@ async function sendMessage() {
 
   isStreaming = true;
   disableInput();
-  const typingRow = showTyping();
 
-  const reply = (await post_endpoint("/api/chat/" + selectedAgentName + "/message/" + activeChatId, 
-     {message: content}))["response"]
-  removeTyping();
+  let finalResponse = "";
 
-  console.log(reply)
+  try {
+    const response = await fetch("/api/chat/" + selectedAgentName + "/message/" + activeChatId, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ message: content })
+    });
 
-  if (!chats[activeChatId]) { isStreaming = false; return; }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
 
-  chats[activeChatId].messages.push({ role: "assistant", content: reply });
-  appendMessage({ role: "assistant", content: reply });
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split("\n\n");
+      buffer = parts.pop();
+
+      for (const part of parts) {
+        if (!part.startsWith("data: ")) continue;
+        const event = JSON.parse(part.slice(6));
+
+        if (event.type === "tool_call") {
+          appendMessage({ role: "tool", content: `Chamando ferramenta: ${event.content}` });
+        } else if (event.type === "tool_result") {
+          appendMessage({ role: "tool", content: event.content });
+        } else if (event.type === "final") {
+          finalResponse = event.content;
+        } else if (event.type === "error") {
+          appendMessage({ role: "system", content: `Erro: ${event.content}` });
+        }
+      }
+    }
+  } catch (err) {
+    console.error(err);
+    appendMessage({ role: "system", content: "Erro de conexão com o servidor." });
+  }
+
+  if (chats[activeChatId] && finalResponse) {
+    chats[activeChatId].messages.push({ role: "assistant", content: finalResponse });
+    appendMessage({ role: "assistant", content: finalResponse });
+  }
 
   isStreaming = false;
   enableInput();
-
   checkForContextDoc();
 }
 
